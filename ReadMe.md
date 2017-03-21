@@ -336,7 +336,7 @@ val y = t + r // t = 10, y = 35
 * A definition inside a block is accessible unless it is shadowed
 * **A function is evaluated under the environment where it is defined, not the enviornment where it is invoked.**
 
-## Rewriting for blocks
+### Rewriting for blocks
 ```scala
 1: val t = 0
 2: def f(x: Int) = t + g(x)
@@ -352,15 +352,324 @@ val y = t + r // t = 10, y = 35
 * Evalutaion by rewriting
 
 ```
-[f=(x)t+g(x),g=(x)x*x],1 
-~ [...,t=0],2
-~ [...],3 
-~ [...],4 
+[],1 
+~ [t=0],2
+~ [..., f=(x)t+g(x)],3 
+~ [..., g=(x)x*x],4 
 ~ [...,x=25],5 
 ~ [...]:[],6 
 ~ [...]:[t=10],7~ [...]:[...,s=25],8 
 ~ [...,r=35],9 
 ~ [...,y=35],10
-4: [f=..., g=..., t=0]:[x=5], t+g(x) ~...~ [...]:[...], 25
-7: [f=..., g=..., t=0]:[x=5], t+g(x) ~...~ [...]:[...], 25
+4: [t=0, f=..., g=..., x=25]:[x=5], t+g(x) ~...~ [...]:[...], 25
+7: [t=0, f=..., g=..., x=25]:[x=5], t+g(x) ~...~ [...]:[...], 25
 ```
+
+### Semi-colons and Parenthesis
+* Block 
+	* Can write two definitions/expressions in a single line using `;`
+	* Can write one definition/expression in two lines using `()`, but can omit `()` when clear
+
+```scala
+// OK
+val r = {
+	val t = 10; val s = square(5); t +
+	a }
+// Not OK
+val r = {
+	val t = 10; val s = sqaure(5); t +
+	s }
+// OK
+val r = {
+	val t = 10; val s = square(5); (t + 
+	s) }
+```
+
+### Exercise Writing Better Code using Blocks
+```scala
+def sqrt(x: Double) = {
+	def sqrtIter(guess: Double): Double = 
+		if (isGoodEnough(guess)) guess
+		else sqrtIter(improve(guess))
+		
+	def isGoodEnough(guess: Double) = 
+		((guess * guess - x).abs/x < 0.001)
+	
+	def improve(guess: Double) = 
+		(guess + x/guess)/2
+	
+	sqrtIter(1)
+}
+	
+sqrt(2)
+```
+
+scope의 장점: name의 life time을 결정할 수 있다. name을 감출수 있다.
+
+## Lazy Call-By-Value
+
+### Lazy call-by-value
+* Lazy call-by-value
+	* Use `lazy val` e.g., `lazy val x = e`
+	* Evaluate the expression **first time it is used**, then bind the name to it
+
+```scala
+def f1(c: Boolean, iv: Int): Int = {
+	if (c) 0
+	else iv * iv * iv
+}
+
+f1(true, {println("ok"); 100+100+100+100}) // ok 0f1(false, {println("ok"); 100+100+100+100}) // ok 64000000
+
+def f2(c: Boolean, iv: =>Int): Int = {
+	if (c) 0
+	else iv * iv * iv
+}
+
+f2(true, {println("ok"); 100+100+100+100}) // 0f2(false, {println("ok"); 100+100+100+100}) // ok ok ok 64000000
+
+def f3(c: Boolean, i: =>Int): Int = {
+	lazy val iv = i
+	if (c) 0
+	else iv * iv * iv
+}
+
+f3(true, {println("ok"); 100+100+100+100}) // 0f3(false, {println("ok"); 100+100+100+100}) // ok 64000000
+```
+
+## Tail Recursion
+### Recursion needs care
+* Summation function
+	* Write a summation function `sum` such that
+	
+	```scala
+	sum(n) = 1 + 2 + ... + n
+	```
+	
+	* Test
+
+	```scala
+	sum(1), sum(100), sum(1000), sum(10000), 
+	sum(100000), sum(1000000)
+	```
+	
+	* What's wrong? (Think about evaluation)
+
+### Recursion: Try 
+```scala
+def sum(n: Int): Int =
+	if (n <= 0) 0 else n + sum(n-1)
+```
+call stack이 함수를 계속 쌓아가는걸 메모리가 견딜 수가 없음
+
+### Recursion: Tail Recursion
+```scala
+import scala.annotation.tailrec
+
+def sum(n: Int): Int = {
+	@tailrec
+	def sumItr(res: Int, m: Int): Int = 
+		if (m <= 0) res else sumItr(m + res, m - 1)
+	sumItr(0, n)
+}
+```
+call stack이 함수를 쌓아가지 않고, stack frame을 교체 하면서 계산함. depth를 고려해서 함수를 설계하고 만약 depth가 많이 깊어지면 tail recursion으로 함수를 설계하라.
+
+## Higher-Order Functions
+### Functions as Values
+* Functions
+	* Functions are normal values of function types `(A_1, ..., A_n => B)`.
+	* They can be copied, passed and retured.
+	* Functions that take functinos as arguments or return functions are called higher-order functions.
+	* Higher-order functions increase code reusability.
+
+### Examples
+```scala
+def sumLinear(n: Int): Int = 
+	if (n <= 0) 0 else n + sumLinear(n-1)
+
+def sumSquare(n: Int): Int =
+	if (n <= 0) 0 else n * n + sumSquare(n-1)
+	
+def sumCubes(n: Int): Int =
+	if (n <= 0) 0 else n * n * n + sumCubes(n-1)
+```
+
+Q: How to write reusable code? 
+
+```scala
+def sum(f: Int=>Int, n: Int): Int =	if (n <= 0) 0 else f(n) + sum(f, n-1)
+	def linear(n: Int) = ndef square(n: Int) = n * ndef cube(n: Int) = n * n * n
+def sumLinear(n: Int) = sum(linear, n)def sumSquare(n: Int) = sum(square, n)def sumCubes(n: Int) = sum(cube, n)
+```
+
+### Anonymous Functions
+* Anonymous Functions
+	* Syntax 
+	
+	```scala
+	(x_1: T_1, ..., x_n: T_n) => e
+	or
+	(x_1, ..., x_n) => e
+	```
+	ex)
+	
+	```scala
+	(x: Int => x*x)(100) // 10000
+	```  
+	
+```scala
+def sumLinear(n: Int) = sum((x:Int)=>x, n)def sumSquare(n: Int) = sum((x:Int)=>x*x, n)def sumCubes(n: Int) = sum((x:Int)=>x*x*x, n)
+```Or simply
+
+```scaladef sumLinear(n: Int) = sum((x)=>x, n)def sumSquare(n: Int) = sum((x)=>x*x, n)def sumCubes(n: Int) = sum((x)=>x*x*x, n)
+```
+
+### Exercise
+```scala
+def sum(f: Int=>Int, a: Int, b: Int): Int = 	if (a <= b) f(a) + sum(f, a+1, b) else 0def product(f: Int=>Int, a: Int, b: Int): Int = 
+	if (a <= b) f(a) * product(f, a+1, b) else 1
+```
+DRY (Do not Repeat Yourself) using a higher-order function, called "mapreduce"
+
+```scala
+def mapReduce(map: Int=>Int, reduce: (Int, Int)=>Int, a: Int, b: Int, init: Int): Int = 
+	if (a <= b) reduce(map(a), mapReduce(map, reduce, a+1, b, init)
+	else init
+/*	call-by-name map and reduce function
+def mapReduce(map: =>(Int=>Int), reduce: =>((Int, Int)=>Int), a: Int, b: Int, init: Int): Int = 
+	if (a <= b) reduce(map(a), mapReduce(map, reduce, a+1, b, init)
+	else init
+*/
+
+def sum(f: Int=>Int, a: Int, b: Int): Int =
+	mapReduce(f, _+_, a, b, 0)
+
+def product(f: Int=>Int, a: Int, b: Int): Int = 
+	mapReduce(f, _*_, a, b, 1)
+```
+
+### Parameterized expression vs. values
+* Functions defined using `def` are not values but parameterized expressions.
+* Anonymous functions are values.
+* But, parameterized expressions are implicitly converted to values.
+* Explicit conversion: `f _`
+* Anonymous functions can be seen as syntatic sugar:
+
+	```scala
+	(x: T) => e
+	```
+	is equivalent to
+	
+	```scala 
+	{ def __noname(x: T) => e; __noname _ }
+	```	
+* One can even write a recursive anonymous functions in this way.
+
+Here are some questions.
+
+* Q: **what's the difference between param, exps and function values?**
+* A: functions values are "closures" (ie. param. exp. + env.)
+* Q: **how to implement call-by-name?**
+* A: The argument expression is converted to a closure.
+
+## Currying
+### Motivation
+```scala
+def sum(f: Int=>Int, a: Int, b: Int): Int = 	if (a <= b) f(a) + sum(f, a+1, b) else 0def linear(n: Int) = ndef square(n: Int) = n * ndef cube(n: Int) = n * n * ndef sumLinear(a: Int, b: Int) = sum(linear, a, b)
+def sumSquare(a: Int, b: Int) = sum(square, a, b) 
+def sumCubes(a: Int, b: Int) = sum(cube, a, b)
+```
+
+We don't want write `a`, `b` repeatedly. We want the following. How?
+
+```scala
+def sumLinear = sum(linear)def sumSquare = sum(square)def sumCubes = sum(cube)
+```
+
+### Solution
+```scala
+def sum(f: Int=>Int): (Int, Int)=>Int = {
+	def sumF(a: Int, b: Int): Int =
+		if (a <= b) f(a) + sumF(a+1, b) else 0
+	sumF
+}
+
+def sumLinear = sum(linear)def sumSquare = sum(square)def sumCubes = sum(cube)
+```
+
+### Benefits
+```scala
+def sumLinear = sum(linear)def sumSquare = sum(square)def sumCubes = sum(cube)
+sumSquare(3,10) + sumCubes(5,20)
+```
+
+We don't need to define the wrapper functions.
+
+```scala
+sum(square)(3,10) + sum(cube)(5,20)
+```
+
+### Multiple Parameter List
+```scala
+def sum(f: Int=>Int): (Int, Int)=>Int = {
+	def sumF(a: Int, b: int): Int = 
+		if (a <= b) f(a) + sumF(a+1, b) else 0
+	sumF
+}
+```
+
+We can also write as follows.
+
+```scala
+def sum(f: Int=>Int): (Int, Int)=>Int = 
+	(a, b) => if (a <= b) f(a) + sum(f)(a+1, b) else 0
+```
+
+Or more simply:
+
+```scala
+def sum(f: Int=>Int)(a: Int, b: Int): Int =
+	if (a <= b) f(a) + sum(f)(a+1, b) else 0
+```
+
+### Currying and Uncurrying
+* A function of type
+
+```scala
+(T_1, T_2, ..., T_n)=>T
+```
+can be turned into one of type
+
+```scala
+T_1=>T_2=>...=>T_n=>T
+```
+
+* This is called "currying" named after Haskell Brooks Curry.
+* The opposite direction is called "uncurrying"
+
+### Currying using Anonymous Functions
+```scala
+def foo(x: Int, y: Int, z: Int)(a: Int, b: Int): Int = 
+	x + y + z + a + bval f1 = (x: Int, z: Int, b: Int) => foo(x,1,z)(2,b) 
+val f2 = foo(_:Int,1,_:Int)(2, _:Int)val f3 = (x: Int, z: Int)=>(b: Int) => foo(x,1,z)(2,b)
+f1(1,2,3)  // 8f2(1,2,3)  // 8f3(1,2)(3) // 8
+```
+
+### Exercise
+Curry the `mapReduce` functions.
+
+```scala
+def mapReduce(reduce: (Int, Int)=>Int, init: Int)(map: Int=>Int(a: Int, b: Int): Int = {
+	if (a <= b) mapReduce(reduce, init)(map)(a+1, b)
+	else init
+}
+
+// need to make a closure since mapReduce is param. code.
+def sum = mapReduce(_+_, 0) _
+
+// val is better than def. Think about why.
+val product = mapReduce(_*_, 1) _
+```
+
+`val`이 더 나은 이유는 `def`로 name binding 하면 함수를 call 할 때 마다 currying 다시 하기 때문이 아닐까. `val` binding 하면, Function value로 return 되기 때문에 선언시에만 currying이 이뤄진다.
