@@ -361,8 +361,10 @@ val y = t + r // t = 10, y = 35
 ~ [...]:[t=10],7~ [...]:[...,s=25],8 
 ~ [...,r=35],9 
 ~ [...,y=35],10
-4: [t=0, f=..., g=..., x=25]:[x=5], t+g(x) ~...~ [...]:[...], 25
-7: [t=0, f=..., g=..., x=25]:[x=5], t+g(x) ~...~ [...]:[...], 25
+4: [t=0, f=..., g=..., x=25]:[x=5], t+g(x) ~ 0+g(5) ~ 25
+g(5): [t=0, f=..., g=...]:[x:5], x*x ~ 5*5 ~ 25
+7: [t=0, f=..., g=..., x=25]:[x=5], t+g(x) ~ 0+g(5) ~ 25
+g(5): [t=0, f=..., g=..., x=25]:[x:5], x*x ~ 5*5 ~ 25
 ```
 
 ### Semi-colons and Parenthesis
@@ -549,6 +551,7 @@ def product(f: Int=>Int, a: Int, b: Int): Int =
 	mapReduce(f, _*_, a, b, 1)
 ```
 
+## 3월 23일
 ### Parameterized expression vs. values
 * Functions defined using `def` are not values but parameterized expressions.
 * Anonymous functions are values.
@@ -562,8 +565,9 @@ def product(f: Int=>Int, a: Int, b: Int): Int =
 	is equivalent to
 	
 	```scala 
-	{ def __noname(x: T) => e; __noname _ }
+	{ def __noname(x: T) = e; __noname _ }
 	```	
+	(`e` must not use `__noname`)
 * One can even write a recursive anonymous functions in this way.
 
 Here are some questions.
@@ -573,10 +577,64 @@ Here are some questions.
 * Q: **how to implement call-by-name?**
 * A: The argument expression is converted to a closure.
 
+### Closures for functinoal values
+```scala
+1: val t = 02: val f = {3:     val t = 104:     def g(x: Int): Int = x + t5:     g _ }    // not g, need g _6: f(20)
+```
+
+* Try: Evaluation without Closures
+
+```scala
+[],1 
+~ [t=0],2
+~ [...]:[],3 
+~ [...]:[t=10],4~ [...]:[...,g=(x)x+t],5 
+~ [t=0,f=(x)x+t],6 
+~ [...],206: [t=0,f=(x)x+t]:[x=20],x+t ~ 20+0 ~ 20
+```
+`g` is a parameterized expression. But the `f` is value. So what't the value of function? 또한 `def`는 자신이 정의 됐던 environment에서 evaluation 되야 한다. `g`를 `f`에 그냥 copy 하는 것은 문제가 생긴다. (만약 `val f`가 아니라 `def f`라면 그런 문제가 안생기나? 애초에 closure 이전의 정의는 `def` 정의 안에 `val`이 들어가는 것이 가능하긴 하나?)
+
+function value는 parameterized expression과 어디서 정의 되었는지 (origin information) 를 둘다 가지고 있어야 한다. (**environment where define**, parameterized expression)은 value 이다. 이 value를 closure라 한다. 
+
+* Evaluation with Closures
+
+```scala
+[],1 
+~ [t=0],2 
+~ [...]:[],3 
+~ [...]:[t=10],4~ [...]:[...,g=(x)x+t],5~ [t=0,f={[t=0]:[t=10,g=(x)x+t],(x)x+t}],6 
+~ [...],306: [t=0]:[t=10,g=(x)x+t]:[x=20],x+t ~ 20+10 ~ 30
+```
+
+### Example: call by name with closrues
+```scala
+1: val t = 0
+2: def f(x: =>Int) = t + x // x is treated as x()
+3: val r = {
+4:     val t = 10
+5:     f(t * t) }          // t*t is treated as () => t*t
+```
+
+* Evaluation with Closures
+
+```scala
+[],1 
+~ [t=0],2 
+~ [...,f=(x:=>Int)t+x],3 
+~ [...]:[],4 
+~ [...]:[t=10],5 
+~ [...,r=100],65: [t=0,f=...]:[x={[t=0,f=...]:[t=10],()t*t}],t+x 
+~ 0 + x ~ 0 + 100 ~ 100x: [t=0,f=...]:[t=10]:[],t*t ~ 10*10 ~ 100
+```
+
+`()=>t*t`로 취급 되므로 `x`를 evaluate할 때 `t`가 정의된 곳으로 가서 `t`의 값을 찾는다. 즉 `t*t`를 (env, parm exp)인 closure로 넘긴다.
+
+expression을 넘기고 싶으면 closure로 package해서 넘겨야 핸다. evaluation시에는 unpack을 한 후 define 됐던 enviroment로 가서 eval한다. origin environment를 Provenance라 한다.
+
 ## Currying
 ### Motivation
 ```scala
-def sum(f: Int=>Int, a: Int, b: Int): Int = 	if (a <= b) f(a) + sum(f, a+1, b) else 0def linear(n: Int) = ndef square(n: Int) = n * ndef cube(n: Int) = n * n * ndef sumLinear(a: Int, b: Int) = sum(linear, a, b)
+def sum(f: Int => Int, a: Int, b: Int): Int = 	if (a <= b) f(a) + sum(f, a+1, b) else 0def linear(n: Int) = ndef square(n: Int) = n * ndef cube(n: Int) = n * n * ndef sumLinear(a: Int, b: Int) = sum(linear, a, b)
 def sumSquare(a: Int, b: Int) = sum(square, a, b) 
 def sumCubes(a: Int, b: Int) = sum(cube, a, b)
 ```
@@ -589,7 +647,7 @@ def sumLinear = sum(linear)def sumSquare = sum(square)def sumCubes = sum(cube)
 
 ### Solution
 ```scala
-def sum(f: Int=>Int): (Int, Int)=>Int = {
+def sum(f: Int => Int): (Int, Int) => Int = {
 	def sumF(a: Int, b: Int): Int =
 		if (a <= b) f(a) + sumF(a+1, b) else 0
 	sumF
@@ -612,7 +670,7 @@ sum(square)(3,10) + sum(cube)(5,20)
 
 ### Multiple Parameter List
 ```scala
-def sum(f: Int=>Int): (Int, Int)=>Int = {
+def sum(f: Int => Int): (Int, Int) => Int = {
 	def sumF(a: Int, b: int): Int = 
 		if (a <= b) f(a) + sumF(a+1, b) else 0
 	sumF
@@ -622,27 +680,28 @@ def sum(f: Int=>Int): (Int, Int)=>Int = {
 We can also write as follows.
 
 ```scala
-def sum(f: Int=>Int): (Int, Int)=>Int = 
+def sum(f: Int => Int): (Int, Int)=>Int = 
 	(a, b) => if (a <= b) f(a) + sum(f)(a+1, b) else 0
 ```
 
 Or more simply:
 
 ```scala
-def sum(f: Int=>Int)(a: Int, b: Int): Int =
+def sum(f: Int => Int)(a: Int, b: Int): Int =
 	if (a <= b) f(a) + sum(f)(a+1, b) else 0
 ```
+If I use `sum(square)`, is it a currying? And then, I can use like `sum(_: Int => Int)(1, 10)`? Yes!
 
 ### Currying and Uncurrying
 * A function of type
 
 ```scala
-(T_1, T_2, ..., T_n)=>T
+(T_1, T_2, ..., T_n) => T
 ```
 can be turned into one of type
 
 ```scala
-T_1=>T_2=>...=>T_n=>T
+T_1 => (T_2 => (... => (T_n => T)...)
 ```
 
 * This is called "currying" named after Haskell Brooks Curry.
@@ -650,9 +709,12 @@ T_1=>T_2=>...=>T_n=>T
 
 ### Currying using Anonymous Functions
 ```scala
+// (Int, Int, Int) => ((Int, Int) => Int)
 def foo(x: Int, y: Int, z: Int)(a: Int, b: Int): Int = 
-	x + y + z + a + bval f1 = (x: Int, z: Int, b: Int) => foo(x,1,z)(2,b) 
-val f2 = foo(_:Int,1,_:Int)(2, _:Int)val f3 = (x: Int, z: Int)=>(b: Int) => foo(x,1,z)(2,b)
+	x + y + z + a + b// (Int, Int, Int) => Intval f1 = (x: Int, z: Int, b: Int) => foo(x,1,z)(2,b)
+// (Int, Int, Int) => Int, automatically conversion
+val f2 = foo(_:Int,1,_:Int)(2, _:Int)
+// (Int, Int) => (Int => Int)val f3 = (x: Int, z: Int) => (b: Int) => foo(x,1,z)(2,b)
 f1(1,2,3)  // 8f2(1,2,3)  // 8f3(1,2)(3) // 8
 ```
 
@@ -660,7 +722,7 @@ val f2 = foo(_:Int,1,_:Int)(2, _:Int)val f3 = (x: Int, z: Int)=>(b: Int) => foo
 Curry the `mapReduce` functions.
 
 ```scala
-def mapReduce(reduce: (Int, Int)=>Int, init: Int)(map: Int=>Int(a: Int, b: Int): Int = {
+def mapReduce(reduce: (Int, Int) => Int, init: Int)(map: Int => Int(a: Int, b: Int): Int = {
 	if (a <= b) mapReduce(reduce, init)(map)(a+1, b)
 	else init
 }
