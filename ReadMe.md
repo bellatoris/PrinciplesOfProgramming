@@ -592,7 +592,7 @@ Here are some questions.
 ~ [t=0,f=(x)x+t],6 
 ~ [...],206: [t=0,f=(x)x+t]:[x=20],x+t ~ 20+0 ~ 20
 ```
-`g` is a parameterized expression. But the `f` is value. So what't the value of function? 또한 `def`는 자신이 정의 됐던 environment에서 evaluation 되야 한다. `g`를 `f`에 그냥 copy 하는 것은 문제가 생긴다. (만약 `val f`가 아니라 `def f`라면 그런 문제가 안생기나? 애초에 closure 이전의 정의는 `def` 정의 안에 `val`이 들어가는 것이 가능하긴 하나?)
+`g` is a parameterized expression. But the `f` is value. So what't the value of function? 또한 `def`는 자신이 정의 됐던 environment에서 evaluation 되야 한다. `g`를 `f`에 그냥 copy 하는 것은 문제가 생긴다. (만약 `val f`가 아니라 `def f`라면 그런 문제가 안생기나? 애초에 closure 이전의 정의는 `def` 정의 안에 `val`이 들어가는 것이 가능하긴 하나? 즉 `def` clause 안에서 정의된 변수들을 사용할 경우 closure를 정의 하지 않고서는 불가능 한지 여쭤보자, 언제 env를 없애는지?, `var`로 정의해서 값을 바꾸면 값이 바뀐다. 모든 `def`를 저장할 때 closure로 바꿔서 저장하는 것도 하나의 방법이다. `var`는 포인터라고 생각해라)
 
 function value는 parameterized expression과 어디서 정의 되었는지 (origin information) 를 둘다 가지고 있어야 한다. (**environment where define**, parameterized expression)은 value 이다. 이 value를 closure라 한다. 
 
@@ -627,8 +627,7 @@ function value는 parameterized expression과 어디서 정의 되었는지 (ori
 ~ 0 + x ~ 0 + 100 ~ 100x: [t=0,f=...]:[t=10]:[],t*t ~ 10*10 ~ 100
 ```
 
-`()=>t*t`로 취급 되므로 `x`를 evaluate할 때 `t`가 정의된 곳으로 가서 `t`의 값을 찾는다. 즉 `t*t`를 (env, parm exp)인 closure로 넘긴다.
-
+`()=>t*t`로 취급 되므로 `x`를 evaluate할 때 `t`가 정의된 곳으로 가서 `t`의 값을 찾는다. 즉 `t*t`를 (env, parm exp)인 closure로 넘긴다.  
 expression을 넘기고 싶으면 closure로 package해서 넘겨야 핸다. evaluation시에는 unpack을 한 후 define 됐던 enviroment로 가서 eval한다. origin environment를 Provenance라 한다.
 
 ## Currying
@@ -690,7 +689,7 @@ Or more simply:
 def sum(f: Int => Int)(a: Int, b: Int): Int =
 	if (a <= b) f(a) + sum(f)(a+1, b) else 0
 ```
-If I use `sum(square)`, is it a currying? And then, I can use like `sum(_: Int => Int)(1, 10)`? Yes!
+If I use `sum(square)`, is it a currying? And then, I can use like `sum(_: Int => Int)(1, 10)`? Yes! 매우 신기하다 아마도 automatically conversion이 일어나서 가능한 일인 것 같다. 알아서 currying의 순서를 조정해 준다.
 
 ### Currying and Uncurrying
 * A function of type
@@ -722,7 +721,7 @@ val f2 = foo(_:Int,1,_:Int)(2, _:Int)
 Curry the `mapReduce` functions.
 
 ```scala
-def mapReduce(reduce: (Int, Int) => Int, init: Int)(map: Int => Int(a: Int, b: Int): Int = {
+def mapReduce(reduce: (Int, Int) => Int, init: Int)(map: Int => Int)(a: Int, b: Int): Int = {
 	if (a <= b) mapReduce(reduce, init)(map)(a+1, b)
 	else init
 }
@@ -734,4 +733,267 @@ def sum = mapReduce(_+_, 0) _
 val product = mapReduce(_*_, 1) _
 ```
 
-`val`이 더 나은 이유는 `def`로 name binding 하면 함수를 call 할 때 마다 currying 다시 하기 때문이 아닐까. `val` binding 하면, Function value로 return 되기 때문에 선언시에만 currying이 이뤄진다.
+`val`이 더 나은 이유는 `def`로 name binding 하면 함수를 call 할 때 마다 currying 다시 하기 때문이 아닐까. `val` binding 하면, Function value로 return 되기 때문에 선언시에만 currying이 이뤄진다. Computed된 새로운 closure를 `def`는 매번 다시 계산하고, `val`은 한번만 계산된다.
+
+## 3월 28일
+
+## Exceptions
+### Exceptions & Handling
+```scala
+class factRangeException(val arg: Int) extends Exception
+
+def fact(n: Int): Int = 
+	if (n < 0) throw new factRangeException(n)
+	else if (n == 0) 1
+	else n * fact(n - 1)
+	
+def foo(n: Int) = fact(n + 10)
+
+try {
+	println(fact(3))
+	println(foo(-100))
+} catch {
+	case e: factRangeException => {
+		println("fact range error: " + e.arg)
+	}
+}
+```
+
+## Datatypes
+### Types so far
+Types have introduction operations and elimination ones.
+
+* Introduction: **how to construct** elements of the type
+* Elimination: **how to use** elements of the type
+
+* Primitve types
+	*  `Int`, `Boolean`, `Double`, `String`
+	*  Intro for `Int`: ...`-2`, `-1`, `0`, `1`, `2`
+	*  Elim for `Int`: `+`, `-`, `*`, `/`, `<`, `<=`, ...
+	
+* Function types
+	* `Int => Int`, `(Int => Int) => (Int => Int)`
+	* Intro: `(x: T) => e`
+	* Elim: `f(v)` 
+
+### Tuples
+* Tuples
+	* Intro: 
+		* `(1, 2, 3): (Int, Int, Int)`
+		* `(1, "a"): (Int, String)`
+		
+	* Elim: 
+		* `(1, "a", 10)._1 = 1`
+		* `(1, "a", 10)._2 = "a"`
+		* `(1, "a", 10)._3 = 10`
+
+Only up to length 22
+
+### Structural Types (a.k.a Record Types): Examples
+```scala
+object foo {    // or, val foo = new {
+	val a = 3
+	def b = a + 1
+	def f(x: Int) = b + x
+	def f(x: String) = "hello" + x
+}
+
+foo.f(3)
+foo.f("gil")
+
+def g(x: { val a: Int; def b: Int;
+           def f(x: Int): Int; def f(x: String): String }) =
+    x.f(3)
+    
+g(foo)
+```
+
+It is named tuple type.
+
+### Structural Types: Scope and Type Alias
+```scala
+val gn = 0
+object foo {
+	val a = 3
+	def b = a + 1
+	def f(x: Int) = b + x + gn
+}
+
+foo.f(3)    // 7 same scoping rule
+
+type Foo = { val a: Int; def b: Int; def f(x: Int): Int }
+
+def g(x: Foo) = {
+    val gn = 10
+    x.f(3)
+}
+    
+g(foo)
+```
+
+`def`와 `val`의 차이? 모든 `def`를 `val`로 대체할 수 있나? non-termination이 없다면 `def`와 `val`은 동일하다? 
+
+```scala
+def loop: Int = loop
+def x(): Int = x
+val a: () => Int = x    // cannot assign loop
+```
+
+### Algebraic Datatypes
+* Ideas 
+	
+	```scala
+	T = C of T * ... * T
+	  | C of T * ... * T
+	  |  ...
+	  | C of T * ... * T
+	```  
+* E.g.
+
+	```scala
+	Attr = Name of String
+	     | Age of Int
+	     | DOB of Int * Int * Int
+	     | Height of Double
+	
+	Intro:
+	      Name("Chulsoo Kim"), Name("Younghee Lee"), Age(16),
+	      DOB(2000, 3, 10), Height(171.5), ...
+	```
+Algebraic Datatype을 그냥 class를 사용해서 대체할 수 있지만, algebraic datatype은 pattern matching을 가능하게 해준다. Pattern matching은 elimination의 한 형태 이다.
+
+### Algegraic Datatypes: Recursion
+* Recursive ADT
+	* E.g.
+	
+		```scala	 
+		IList = INil
+		      | ICons of Int * IList       Intro:
+              INil(), ICons(3, INil), ICons(2, ICons(1, INil)), ...
+       ```
+
+### Algebraic Datatypes In Scala
+* `Attr`
+
+	```scala
+	sealed abstract class Attr	case class Name(name: String) extends Attr	case class Age(age: Int) extends Attr	case class DOB(year: Int, month: Int, day: Int) extends Attr 
+	case class Height(height: Double) extends Attr
+		val a: Attr = Name("Chulsoo Kim")
+	val b: Attr = DOB(2000,3,10)
+	```
+
+* `IList`
+
+	```scala
+	sealed abstract class IList	case class INil() extends IList	case class ICons(hd: Int, tl: IList) extends IList	val x: IList = ICons(2, ICons(1, INil()))
+	```
+
+### Exercise
+```scala
+IOption = INone        | ISome of IntBTree = Leaf      | Node of Int * BTree * BTree
+```
+
+### Solution
+```scala
+sealed abstract class IOption
+case class INone() extends IOption
+case class ISome(some: Int) extends IOption
+
+sealed abstract class BTree
+case class Leaf() extends BTree
+case class Node(value: Int, left: BTree, right: BTree) extends BTree
+```
+
+### Pattern Matching
+* Pattern Matching
+	* A way to use algebraic datatypes
+	* **Heart** of Algebraic Datatypes
+
+	```scala
+	e match {
+		case C1(...) => e1
+		...
+		case Cn(...) => en
+	}
+	```
+	 
+### Pattern Matching: An Example
+```scala
+def length(xs: IList): Int = 
+	xs match {
+		case INil() => 0
+		case ICons(x, tl) => 1 + length(tl)
+	}
+
+length(x)
+
+def gen(n: Int): IList = 
+	if (n < 0) INil()
+	else ICons(n, gen(n - 1))
+```
+Pattern matching은 case analysis이다. 각각의 `case`는 같은 `type`을 내놔야 한다.
+
+### Advanced Pattern Matching
+* Advanced Pattern Matching
+
+	```scala
+	e match {
+		case P1 => e1
+		...
+		case Pn => en
+	}
+	```
+* One can combine constructors and use `_` and `|` in a pattern
+	* `case ICons(x, INil()) | ICons(x, ICons(_, INil())) => ...`  
+* The given value `e` is matched against the first pattern `P1`.  
+If succeeds, evaluate `e1`.  
+If fails, `e` is matched against `P2`.  
+If succeeds, evaluate `e2`.  
+If fails, ...
+* The compiler checks exhaustiveness. You should not have missing pattern.
+
+### Advanced Pattern Matching: An Example
+```scala
+def secondElmt(xs: IList): IOption = 
+	xs match {
+		case INil() | ICons(_, INil()) => INone()
+		case ICons(_, ICons(x, _)) => ISome(x)
+	}
+```
+Vs.
+
+```scaladef secondElmt2(xs: IList) : IOption =  xs match {	case INil() | ICons(_, INil()) => INone() 
+	case ICons(_, ICons(x, _)) => ISome(x) 
+	case _ => INone()}
+```
+
+### Pattern Matching on Int
+```scala
+def factorial(n: Int) : Int = n match {	case 0 => 1	case _ => n * factorial(n-1) 
+}def fib(n: Int) : Int = n match {	case 0 | 1 => 1	case _ => fib(n-1) + fib(n-2) 
+}
+```
+
+### Pattern Matching with If
+```scala
+def f(n: Int) : Int = n match {	case 0 | 1 => 1 
+	case _ if (n <= 5) => 2
+	case _ => 3}
+def f(t: BTree) : Int = t match {	case Leaf() => 0	case Node(n, _, _) if (n <= 10) => 1 
+	case Node(_, _, _) => 2}
+```
+
+### Exercise
+Write a function `find(t: BTree, x: Int)` that checks whether `x` is in `t`.
+
+```scala
+def find(t: BTree, x: Int): Boolean = t match {
+	case Leaf() => false
+	case Node(n, left, right) => 
+		if (x == n) true
+		else if (x < n) find(left, x)
+		else find (right, x)
+}
+
+def t: BTree = Node(5,Node(4,Node(2,Leaf(),Leaf()),Leaf()), Node(7,Node(6,Leaf(),Leaf()),Leaf()))find(t,7)
+```
