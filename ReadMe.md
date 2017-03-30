@@ -952,6 +952,8 @@ If succeeds, evaluate `e2`.
 If fails, ...
 * The compiler checks exhaustiveness. You should not have missing pattern.
 
+## 3월 30일
+
 ### Advanced Pattern Matching: An Example
 ```scala
 def secondElmt(xs: IList): IOption = 
@@ -987,13 +989,281 @@ def f(n: Int) : Int = n match {	case 0 | 1 => 1
 Write a function `find(t: BTree, x: Int)` that checks whether `x` is in `t`.
 
 ```scala
+@tailrec
 def find(t: BTree, x: Int): Boolean = t match {
 	case Leaf() => false
 	case Node(n, left, right) => 
 		if (x == n) true
 		else if (x < n) find(left, x)
-		else find (right, x)
+		else find(right, x)
+}
+
+// if it is not binary search tree
+def find(t: BTree, x: Int): Boolean = t match {
+	case Leaf() => false
+	case Node(n, left, right) => 
+		if (x == n) true
+		else if find(left, x) || find(right, x)    // evaluate right-hand side only if left returns false
+}
+
+// How about tail recursion
+def find(t: BTree, x: Int): Boolean = {
+	@tailrec
+	def nestedFind(t: BTree, isExist: Boolean): Boolean = t match {
+		case Leaf() => isExist	
+		case Node(n, left, right) => 
+			if (x == n) true
+			else nestedFind(left, f
+	}
 }
 
 def t: BTree = Node(5,Node(4,Node(2,Leaf(),Leaf()),Leaf()), Node(7,Node(6,Leaf(),Leaf()),Leaf()))find(t,7)
+```
+
+## Type Checking & Inference (Concept)
+### What Are Types For?
+* Typed Programming
+
+	```scala
+	def id1(x: Int): Int = x
+	def id2(x: Double): Double =x
+	```
+	
+	* At run time, type information is erased (ie, `id1` = `id2`)
+
+* Untyped Programming
+
+	```scala
+	def id(x) = x
+	```
+	
+	* Do not care about types at compile time.
+	* But many such languages check types at run time paying cost.
+	* Without run-time type check, errors can be badly propagated.
+
+* Why is compile-time type checking for?
+	* Can detect	type errors at compile time. 
+	* Increase Readability (Giva a good abstraction).
+	* Soundness: Well-typed programs raise no type errors at run time.
+
+### Type Checking and Inference
+* Type Checking 
+
+	```scala
+	x1:T1, x2:T2, ..., xn:Tn => e: T
+	```
+	
+	* `def f(x: Boolean): Boolean = x > 3` => Type error
+	* `def f(x: Int): Boolean = x > 3` => OK. `f: (x: Int)Boolean`
+
+* Type Inference
+
+	```scala
+	x1:T1, x2:T2, ..., xn:Tn => e: ?
+	```  
+	
+	* `def f(x: Int) = x > 3` => Ok by type inference. `f: (x: Int)Boolean`
+	* Too much type inferences is not good. Why?
+		* 사람이 못알아 봐서 
+
+## Parametric Polymorphism
+### Parametric Polymorphism: Functions
+* Problem
+
+	```scala
+	def id1(x: Int): Int = x
+	def id2(x: Double): Double = x
+	```
+	
+	* Can we avoid DRY?
+	* Polymorphism to the rescue!
+
+* Parametric Polymorphism (a.k.a. For-all Types)
+
+	```scala
+	def id[A](x: A): A = x
+	```
+	
+	* The type of `id` is `[A](x: A)A`
+	* `id` is a parametric expression
+	* `id[T] _` is a value of type `T => T` for any type `T`.
+
+### Examples
+```scala
+def id[A](x: A) = x
+
+id(3)
+id("abc")
+
+def applyn[A](f: A => A, n: Int, x: A): A = 
+	n match {
+		case 0 => x
+		case _ => f(applyn(f, n - 1, x))
+	}
+	
+applyn((x: Int) => x + 1, ,100, 3)
+applyn((x: String) => x + "!", 10, "gil")
+applyn(id[String], 10, "hur")
+
+def foo[A, B](f: A => A, x: (A, B)): (A, B) =
+	(applyn[A](f, 10, x._1), x._2)
+	
+foo[Sting, Int]((x: String) => x + "!", ("abc", 10))
+```
+
+### Full Polymorphism using Scala's trick
+```scala
+type Applyn = { def apply[A](f: A => A, n: Int, x: A): A }
+
+object applyn {
+	def apply[A](f: A => A, n: Int, x: A): A = 
+		n match {
+			case 0 => x
+			case _ => f(apply(f, n - 1, x))
+		}
+}
+
+applyn((x: String) => x + "!", 10, "gil")
+
+def foo(f: Applyn): String = {
+	val a: String = f[String]((x: String) => x + "!", 10, "gil")
+	val b: Int = f[Int]((x: Int) => x + 2, 10, 5)
+	a + b.toString()
+}
+```
+
+### Parametric Polymorphism: Datatypes
+```scala
+sealed abstract class MyOption[A]
+case class MyNone[A]() extends MyOption[A]
+case class MySome[A](some: A) extends MyOption[A]
+
+sealed abstract class MyList[A]
+case class MyNil[A]() extends MyList[A]
+case class MyCons[A](hd: A, tl: MyList[A]) extends MyList[A]
+
+sealed abstract class BTree[A]
+case class Leaf[A]() extends BTree[A]
+case class Node[A](value: A, left: BTree[A], right: BTree[A]) extends BTree[A]
+
+def x: MyList[Int] = MyCons(3, MyNil())
+def y: MyList[String] = MyCons("abc", MyNil())
+```
+
+### Exercise
+```scala
+BSTree[A] = Leaf
+          | Node of Int * A * BSTree[A] * BSTree[A]
+```
+
+```scala
+sealed abstract class BSTree[A]
+case class Leaf[A]() extends BSTree[A]
+case class Node[A](key: Int, value: A, left: BSTree[A], right: BSTree[A]) extends BSTree[A]
+
+def lookup[A](t: BSTree[A], k: Int): MyOption[A] = 
+	t match {
+		case Leaf() => MyNone()
+		case Node(key, value, left, right) => 
+			if (k == key) MySome(k)
+			else if (k < key) lookup[A](left, k)
+			else lookup[A](right, k)
+	}
+	
+def t: BSTree[String] =
+	Node(5,"My5", Node(4,"My4",Node(2,"My2",Leaf(),Leaf()),Leaf()), Node(7,"My7",Node(6,"My6",Leaf(),Leaf()),Leaf()))
+	
+lookup(t, 7)
+lookup(t, 3)
+```
+
+### A Better Way
+```scala
+sealed abstract class BTree[A]
+case class Leaf[A]() extends BTree[A]
+// set default value of left and right children
+case class Node[A](value: A, left: BTree[A]=Leaf[A](), right: BTree[A]=Leaf[A]()) extends BTree[A]
+
+type BSTree[A] = BTree[(Int, A)]
+
+def lookup[A](t: BSTree[A], k: Int): MyOption[A] = 
+	t match {
+		case Leaf() => MyNone()
+		case Node(v, left, right) =>
+			if (k == v._1) MySome(v._2)
+			else if (k < v._1) lookup(left, k)
+			else lookup(right, k)
+	}
+
+def t: BSTree[String] = Node((5,"My5"), Node((4,"My4"),Node((2,"My2"))), Node((7,"My7"), Node((6,"My6"))))
+	
+lookup(t, 7)
+lookup(t, 3)
+```
+
+### Polymorphic Option (Library)
+* `Option[T]`
+	* Intro:
+	
+	```scala
+	None
+	Some(x)
+	Library functions
+	```
+	
+	* Elim:
+
+	```scala
+	Pattern matching
+	Library functions
+	```
+
+```scala
+Some(3): Option[Int]
+Some("abc"): Option[String]
+None: Option[Int]
+None: Option[String]
+```
+
+### Polymorphic List (Library)
+* `List[T]`
+	* Intro:
+
+	```scala
+	Nil
+	x :: L
+	Library functions
+	```
+	
+	* Elim:
+	
+	```scala
+	Pattern matching
+	Library functions
+	```
+
+```scala
+"abc"::Nil: List[String]
+List(1,3,4,2,5) = 1::3::4::2::5::Nil: List[Int]
+```   
+
+# Part 2 Object-Oriented Programming with Subtypes
+## SubType Polymorphism (Concept)
+### Motivation
+We want:
+
+```scala
+object tom {
+	val name = "Tom"
+	val home = "02-880-1234"
+}
+
+object bob {
+	val name = "Bob"
+	val mobile = "010-1111-2222"
+}
+
+def greeting(r: ???) = "Hi " + r.name + ", How are you?"
+greeting(tom)
+greeting(bob)
 ```
