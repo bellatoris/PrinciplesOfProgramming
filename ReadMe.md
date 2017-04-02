@@ -1007,14 +1007,34 @@ def find(t: BTree, x: Int): Boolean = t match {
 }
 
 // How about tail recursion
+// I need to use List! It is really difficult.
 def find(t: BTree, x: Int): Boolean = {
 	@tailrec
-	def nestedFind(t: BTree, isExist: Boolean): Boolean = t match {
-		case Leaf() => isExist	
-		case Node(n, left, right) => 
-			if (x == n) true
-			else nestedFind(left, f
+	def nestedFind(treeList: List[BTree]): Boolean = treeList match {
+		case Nil => false
+		case t :: ts => t match {
+			case Leaf() => nestedFind(ts)
+			case Node(n, left, right) => 
+				if (x == n) true
+				else nestedFind(left :: right :: ts)
+		} 
 	}
+	
+	nestedFind(List(t))
+}
+
+// How about sum of all tree nodes with tail recursion
+def sum(t: BTree): Int = {
+	@tailrec
+	def nestedSum(acc: Int, treeList: List[BTree]): Int = treeList match {
+		case Nil => acc
+		case t :: ts => t match {
+			case Leaf() => nestedSum(acc, ts)
+			case Node(n, left, right) => nestedSum(acc + n, left :: right :: ts)
+		}
+	}
+	
+	nestedSum(0, List(t))
 }
 
 def t: BTree = Node(5,Node(4,Node(2,Leaf(),Leaf()),Leaf()), Node(7,Node(6,Leaf(),Leaf()),Leaf()))find(t,7)
