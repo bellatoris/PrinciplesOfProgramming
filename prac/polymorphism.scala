@@ -1,6 +1,6 @@
 object Main {
   def main(args: Array[String]): Unit = {
-    /*
+    
     def id[A](x: A) = x
 
     id(3)
@@ -20,8 +20,10 @@ object Main {
       (applyn[A](f, 10, x._1), x._2)
 
     foo[String, Int]((x: String) => x + "!", ("abc", 10))
-    */
-
+    
+    def gee[A, B](f: ((A, B)) => (A, B), x: (A, B)): (A, B) =
+      applyn[(A, B)](f, 10, x)
+    /*
     type Applyn = { def apply[A](f: A => A, n: Int, x: A): A }
 
     object applyn {
@@ -41,5 +43,6 @@ object Main {
     }
 
     println(foo(applyn))
+    */
   }
 }

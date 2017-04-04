@@ -1086,6 +1086,7 @@ def t: BTree = Node(5,Node(4,Node(2,Leaf(),Leaf()),Leaf()), Node(7,Node(6,Leaf()
 	* Too much type inferences is not good. Why?
 		* 사람이 못알아 봐서 
 
+## 4월 4일
 ## Parametric Polymorphism
 ### Parametric Polymorphism: Functions
 * Problem
@@ -1107,6 +1108,7 @@ def t: BTree = Node(5,Node(4,Node(2,Leaf(),Leaf()),Leaf()), Node(7,Node(6,Leaf()
 	* The type of `id` is `[A](x: A)A`
 	* `id` is a parametric expression
 	* `id[T] _` is a value of type `T => T` for any type `T`.
+	* There is no polymophic type because of technical reason.
 
 ### Examples
 ```scala
@@ -1129,6 +1131,9 @@ def foo[A, B](f: A => A, x: (A, B)): (A, B) =
 	(applyn[A](f, 10, x._1), x._2)
 	
 foo[Sting, Int]((x: String) => x + "!", ("abc", 10))
+
+def gee[A, B](f: ((A, B)) => (A, B), x: (A, B)): (A, B) = 
+	applyn[(A, B)](f, 10, x)
 ```
 
 ### Full Polymorphism using Scala's trick
@@ -1150,7 +1155,11 @@ def foo(f: Applyn): String = {
 	val b: Int = f[Int]((x: Int) => x + 2, 10, 5)
 	a + b.toString()
 }
+
+foo(applyn)
 ```
+
+만약 polymorphic function type을 argument로 넘기고 싶다면, record type으로 만들어서 넘기면 된다.
 
 ### Parametric Polymorphism: Datatypes
 ```scala
@@ -1287,3 +1296,70 @@ def greeting(r: ???) = "Hi " + r.name + ", How are you?"
 greeting(tom)
 greeting(bob)
 ```
+We Note that we have
+
+```scalatom: { val name: String; val home: String }bob: { val name: String; val mobile: String }
+```
+
+### Sub Types to the Rescue!
+```scala
+type NameHome = { val name: String; val home: String } 
+type NameMobile = { val name: String; val mobile: String } 
+type Name = { val name: String }```
+`NameHome <: Name` (NameHome is a sub type of Name) 
+`NameMobile <: Name` (NameMobile is a sub type of Name)```scaladef greeting(r: Name) = "Hi " + r.name + ", How are you?" 
+greeting(tom)greeting(bob)
+```
+
+### Sub Types
+* The sub type relation is kind of the subset relation
+* But they are **NOT** the same.
+* `T <: S` Every element of `T` **can be used as** that of `S`.
+* Cf. `T` is a subset of `S`. Every element of `T` **is** that of `S`.
+* Why polymorphism? 
+	* A function of type `S => R` can be used as `T => R` for many subtyped of `T` of `S`.
+	* Note that `S => R <: T => R` when `T <: S` 
+
+### Two Kinds of Sub Types
+* Structural Sub Types
+	* The system implicitly determines the sub type relation by the structures of data types.
+	* Structurally equivalent types are the same.
+
+* Nominal Sub Types
+	* The use explicitly specify the sub type relation using the names of data types.
+	* Structurally equivalent types with different names may be different.  
+
+## Structural Sub Types
+### General Sub Type Rules
+* Reflexivity: For any type `T`, we have:
+
+	```scala
+	T <: T
+	```
+
+* Transitivity: For any types `T`, `S`, `R`, we have:
+	
+	```scala
+	T <: R      R <: S
+	==================
+	      T <: S
+	``` 
+	
+### Sub Types for Special Types
+* Nothing: The empty set
+* Any: The set of all values
+* For any type `T`, we have:
+
+	```scala
+	Nothing <: T <: Any
+	```
+	
+* Example
+
+	```scala
+	val a: Int = 3
+	val b: Any = a
+	def f(a: Nothing): Int = a
+	```
+
+### Sub Types for Records
