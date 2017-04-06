@@ -1277,6 +1277,7 @@ List(1,3,4,2,5) = 1::3::4::2::5::Nil: List[Int]
 ```   
 
 # Part 2 Object-Oriented Programming with Subtypes
+## 4월 6일
 ## SubType Polymorphism (Concept)
 ### Motivation
 We want:
@@ -1318,7 +1319,10 @@ greeting(tom)greeting(bob)
 * Cf. `T` is a subset of `S`. Every element of `T` **is** that of `S`.
 * Why polymorphism? 
 	* A function of type `S => R` can be used as `T => R` for many subtyped of `T` of `S`.
-	* Note that `S => R <: T => R` when `T <: S` 
+	* **Note that** `S => R <: T => R` **when** `T <: S` 
+		* `T <: S` 라면 `S`의 자리에 `T`가 들어가도 된다는 뜻, 그렇다면 `S => R`은 `T`와 `S` 둘다 받을 수 있으므로 `T => R`의 자리에 `S => R`이 들어갈 수 있다.
+	* **Note that** `R => T <: R => S` **when** `T <: S`
+		* `T <: S` 라면 `S`의 자리에 `T`가 들어가도 된다는 뜻, 그렇다면 `R => S`는 `S`를 return 해야 하는데 `S`자리에 `T`가 쓰일 수 있으므로 `R => S` 자리에는 `R => T`가 들어갈 수 있다.  
 
 ### Two Kinds of Sub Types
 * Structural Sub Types
@@ -1346,8 +1350,8 @@ greeting(tom)greeting(bob)
 	``` 
 	
 ### Sub Types for Special Types
-* Nothing: The empty set
-* Any: The set of all values
+* `Nothing`: The empty set
+* `Any`: The set of all values
 * For any type `T`, we have:
 
 	```scala
@@ -1363,3 +1367,406 @@ greeting(tom)greeting(bob)
 	```
 
 ### Sub Types for Records
+* permutation
+
+	```scala
+	==========================================================
+	{ ...; x: T_1; y:T_2; ... } <: { ...; y: T_2; x:T_1; ... }
+	```
+	
+* Width
+	
+	```scala
+	==================================
+	{ ...; x: T; ... } <: { ...; ... }
+	```
+	
+* Depth
+
+	```scala
+	                 T <: S
+	========================================
+	{ ...; x: T; ... } <: { ...; x: S; ... }
+	```
+	
+* Example 
+
+	```scala
+	{ val x: { val y: Int; val z: String }, val w: Int }
+	<:        (by permutation)
+	{ val w: Int; val x: { val y: Int; val z: String } }
+	<:        (by depth & width)
+	{ val w: Int; val x: { val z: String } }
+	```
+	
+### Sub Types for Functions
+* Function Sub Type
+
+	```scala
+	 T <: T`      S <: S` 
+	======================
+	(T' => S) <: (T => S')
+	```
+	
+* Example
+
+	```scala
+	def foo(s: { val a: Int; val b: Int }) :
+		{ val x: Int; val y: Int } = {
+		object tmp {
+			val x = s.b
+			val y = s.a
+		}
+		tmp
+	}
+	
+	val gee:
+		{ val a: Int; val b: Int; val c: Int } =>
+		{ val x: Int } = 
+		foo _
+	```
+It means `foo <: gee`.  `gee.input <: foo.input` by width. `foo.output <: gee.output` by width. `foo` 에다가 3개의 input을 넣어도 2개만 쓰면되고, `foo`가 두개를 return해도 하나만 쓰면 되므로, `gee`를 `foo`로 대체 가능하다.
+
+## Classes
+### Class: Parameterized Record
+```scala
+object gee {
+	val a: Int = 10
+	def b: Int = a + 20
+	def f(z: Int): Int = b + 20 + z
+}
+type gee_type = { val a: Int, def b: Int; def f(z: Int): Int }
+
+class foo_type(x: Int, y: Int) {
+	val a: Int = x
+	def b: Int = a + y
+	def f(z: Int): Int = b + y + z
+}
+val foo: foo_type = new foo_type(10, 20)
+```
+
+* use `foo.a` `foo.b` `foo.f`
+* `foo` is a value of `foo_type`
+* `gee` is a value of `gee_type`
+
+### Class: No Structural Sub Typing
+* Records: Structural sub-typing
+	
+	```scala
+	foo_type <: gee_type
+	```
+
+* Classes: Nominal sub-typing
+
+	```scala
+	gee_type !<: foo_type
+	``` 
+	
+```scala
+val v1: gee_type = foo
+val v2: foo_type = goo    // type error
+```
+
+### Class: Can be Recursive!
+```scala
+class MyList[A](v: A, nxt: Option[MyList[A]]) {
+	val value: A = v
+	val next: Option[MyList[A]] = nxt
+}
+type YourList[A] = Option[MyList[A]]
+
+val t: YourList[Int] = Some(new MyList(3, Some(new MyList(4, None))))
+```
+
+### Simplification using Argument Members
+```scala
+class MyList[A](v: A, nxt: Option[MyList[A]]) {
+	val value = v
+	val next = nxt
+}
+
+class MyList[A](val value: A, val next: Option[MyList[A]]) {
+}
+
+class MyList[A](val value: A, val next: Option[MyList[A]])
+```
+
+### Simplification using Companion Object
+```scala
+class MyList[A](v: A, nxt: Option[MyList[A]]) {
+	val value = v
+	val next = nxt
+}
+
+object MyList {
+	def apply[A](v: A, nxt: Option[MyList[A]]) =
+		new MyList(v, nxt)
+}
+type YourList[a] = Option[MyList[A]]
+
+val t0 = None
+val t1 = Some(new MyList(3, Some(new MyList(4, None))))
+val t2 = Some(MyList(3, Some(MyList(4, None))))
+```
+
+### Exercise
+Define a class "`MyTree[A]`" for binary trees:
+
+```scala
+MyTree[A] = 
+	(value: A) * 
+	(left: Option[MyTree[A]]) *
+	(right: Option[MyTree[A]])
+```
+
+### Solution
+```scala
+class MyTree[A](v: A, lt: Option[MyTree[A]], rt: Option[MyTree[A]]) {
+	val value = v
+	val left = lt
+	val right = rt
+}
+type YourTree[A] = Option[MyTree[A]]
+
+val t0: YourTree[Int] = None
+val t1: YourTree[Int] = Some(new MyTree(3, None, None))
+val t2: YourTree[Int] = Some(new MyTree(3, Some(new MyTree(4, None, None)), None))
+```
+
+## Nominal Sub Typing for Classes
+### Nominal Sub Typing, a.k.a Inheritance
+```scala
+class foo_type(x: Int, y: Int) {
+	val a: Int = x
+	def b: Int = a + y
+	def f(z: Int): Int = b + y + z
+}
+
+class gee_type(x: Int) extends foo_type(x+1, x+2) {
+	val c: Int = f(x) + b
+}
+```
+
+```scala
+gee_type <: foo_type
+```
+
+```scala
+(new gee_type(30)).c
+def test(f: foo_type) = f.a + f.b
+test(new foo_type(10, 20))
+test(new gee_type(30))
+```
+
+### Overriding 1
+```scala
+class foo_type(x: Int, y: Int) {
+	val a: Int = x
+	def b: Int = a + y
+	def f(z: Int): Int = b + y + z
+}
+class gee_type(x: Int) extends foo_type(x+1, x+2) {
+	override def f(z: Int) = b + z
+	// or, override def f(z: Int) = super.f(z) * 2
+	val c: Int = f(x) + b
+}
+(new gee_type(30)).c
+```
+
+Q: Can we override with a different type?
+
+```scala
+override def f(z: Any): Int = 77        // No, arg: diff type (why not sub type?)
+def f(z: Any): Int = 77                 // Yes, arg: diff type
+override def f(z: Int): Nothing = ???   // Yes, ret: sub type
+```
+
+### Overriding 2
+```scala
+class foo_type(x: Int, y: Int) {
+	val a: Int = x
+	def b: Int = a + y
+	def f(z: Int): Int = b + y + z
+}
+
+class gee_type(x: Int) extends foo_type(x+1, x+2) {
+	override def b = 10
+}
+
+(new gee_type(30)).b
+```
+
+### Example: My List
+```scala
+class MyList[A](v: A, nxt: Option[MyList[A]]) {
+	val value = v
+	val next = nxt
+}
+type YourList[A] = Option[MyList[A]]
+val t: YourList[Int] = Some(new MyList(3, Some(new MyList(4, None))))
+```
+
+Let's use sub typing
+
+```scala
+class MyList[A]()
+
+class MyNil[A]() extends MyList[A]
+object MyNil { def apply[A]() = new MyNil[A]() }
+
+class MyCons[A](val hd: A, val tl: MyList[A]) extends MyList[A]
+object MyCons { def apply[A](hd: A, tl: MyList[A]) = new MyCons[A](hd, tl) }
+
+val t: MyList[Int] = new MyCons(3, (new MyCons(4, new MyNil())))
+val t2: MyList[Int] = MyCons(3, MyNil())
+
+def foo(x: MyList[Int]) = ???
+```
+
+### Case Class
+```scala
+class MyList[A]() { ... }
+
+case class MyNil[A]() extends MyList[A] { ... }
+
+case class MyCons[A]()(hd: A, tl: MyList[A]) extends MyList[A] { ... }
+
+val t: MyList[Int] = MyCons(3, MyNil())
+```
+
+**\+ Pattern Matching**
+
+Cf. `sealed abstract class MyList[A]`
+
+### Exercise
+Define "`MyTree[A]`" using sub class.
+
+```scala
+class MyTree[A](v: A, lt: Option[MyTree[A]], rt: Option[MyTree[A]]) {
+	val value =v 
+	val left = lt
+	val right =rt
+}
+
+type YourTree[A] = Option[MyTree[A]]
+```
+
+### Solution
+```scala
+sealed abstract class MyTree[A]
+case class MyLeaf[A]() extends MyTree[A] 
+case class MyNode[A](v: Int, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
+
+val t: MyTree[Int] = Node(3, Node(4, Empty(), Empty()), Empty())
+
+t match {
+	case Empty() => 0
+	case Node(v, l, r) => v
+}
+```
+
+## Abstract Classes for Specification
+### Abstract Class: Specification
+* Abstract Classes
+	* Can be used to abstract away the implementation details.
+
+**Abstract classes for Specification**  
+**Concrete sub-classes for Implementation**
+
+* Example Specification
+
+```scala
+abstract class Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+def sumElements(xs: Iter[Int]): Int = xs.getValue match {
+	case None => 0
+	case Some(n) => n + sumElements(xs.getNext)
+}
+```	 
+
+### Concrete Class: Implementation
+```scala
+sealed abstract class MyList[A] extends Iter[A]
+case class MyNil[A]() extends MyList[A] {
+	def getValue = None
+	def getNext = this
+}
+case Class MyCons[A](val hd: A, val tl: MyList[A])  extends MyList[A] {
+	def getValue =Some(hd)
+	def getNext = tl
+}
+
+val t1 = MyCons(3, MyCons(5, MyCons(7, MyNil())))
+
+sumElements(t1)
+```
+
+### Exercise
+Define `IntCounter(n)` that implements the specification `Iter[A]`
+
+```scala
+class IntCounter(n: Int) extends Iter[Int] {
+	def getValue = if (n >= 0) Some(n) else None
+	def getNext = IntCounter(n - 1)
+}
+
+sumElements(new IntCounter(100))
+```
+
+## More on Abstract Classes
+### Problem: Iter for MyTree
+```scala
+abstract class Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+sealed abstract class MyTree[A]
+case class Empty[A]() extends MyTree[A]
+case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
+```
+
+Q: Can `MyTree[A]` implement `Iter[A]`?
+
+### Solution: Better Speicifiation
+```scala
+abstract class Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+abstract class Iterable[A] {
+	def iter: Iter[A]
+}
+```
+
+### Let's Use MyList
+```scala
+sealed abstract class MyList[A] extends Iter[A]
+case class MyNil[A]() extends MyList[A] {
+	def getValue = None
+	def getNext = this
+}
+case class MyCons[A](val hd: A, val tl: MyList[A]) extends MyList[A] {
+	def getValue = Some(hd)
+	def getNext = tl 
+}
+```
+
+### `MyTree <: Iterable` (Try)
+```scala
+sealed abstract class MyTree[A] extends Iterable[A]
+case class Empty[A]() extends MyTree[A] {
+	def iter = MyNil()
+}
+case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A] {
+	// "val iter" is more specific than "def iter"
+	// so it can be used in a sub type.
+	// In this example, "val iter" is also
+	// more efficient than "def iter".
+	val iter = MyCons(value, ???(left, right))
+}
+```
