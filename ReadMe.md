@@ -1442,12 +1442,28 @@ class foo_type(x: Int, y: Int) {
 	def b: Int = a + y
 	def f(z: Int): Int = b + y + z
 }
-val foo: foo_type = new foo_type(10, 20)
+val foo: foo_type = new foo_type(10, 20) // value of foo_type not structural type
+
+def zoo_type(x: Int, y: Int) = new {
+	val a = x
+	val b = a + y
+	def f(z: Int): Int = b + y + z
+}
+
+class foo_type2(x: Int, y: Int) {
+	val a: Int = x
+	def b: Int = a + 20
+	def f(z: Int): Int = b + 20 + z
+}
+
+val foo2: foo_type = foo_type2(10, 20) // type error
 ```
 
 * use `foo.a` `foo.b` `foo.f`
 * `foo` is a value of `foo_type`
 * `gee` is a value of `gee_type`
+
+Class looks like function. But there are some differences. Notion of class introduces another typing. Class is not structural type. There is no implicit sub typing between classes.
 
 ### Class: No Structural Sub Typing
 * Records: Structural sub-typing
@@ -1464,7 +1480,7 @@ val foo: foo_type = new foo_type(10, 20)
 	
 ```scala
 val v1: gee_type = foo
-val v2: foo_type = goo    // type error
+val v2: foo_type = gee    // type error
 ```
 
 ### Class: Can be Recursive!
@@ -1478,6 +1494,12 @@ type YourList[A] = Option[MyList[A]]
 val t: YourList[Int] = Some(new MyList(3, Some(new MyList(4, None))))
 ```
 
+Structural type cannot be recursive. If we want recursive datatype, we need to use algebraic data type. Because syntatically structural data type has no name. And implicit sub typing makes recursive type declaration be impossible.
+
+And implicit sub typing makes programmer understand code.
+
+Class and Structural type always contains `null` value. But it is not type safe. Algebraic datatype 과 class 의 차이: class 는 오직 하나의 constructor field 만 존재한다. 반면 algebraic datatype 은 constructor field의 disjoint union 을 제공한다. `null` value 를 제공하는 이유는 이러한 disjoint union 을 class 에도 비슷하게 나마 제공하기 위함이다?
+
 ### Simplification using Argument Members
 ```scala
 class MyList[A](v: A, nxt: Option[MyList[A]]) {
@@ -1486,7 +1508,10 @@ class MyList[A](v: A, nxt: Option[MyList[A]]) {
 }
 
 class MyList[A](val value: A, val next: Option[MyList[A]]) {
-}
+} 
+
+val a: MyList[Int] = new MyList[Int](3, None)
+a.value // 3
 
 class MyList[A](val value: A, val next: Option[MyList[A]])
 ```
@@ -1496,13 +1521,13 @@ class MyList[A](val value: A, val next: Option[MyList[A]])
 class MyList[A](v: A, nxt: Option[MyList[A]]) {
 	val value = v
 	val next = nxt
-}
+} // can't be length 0
 
 object MyList {
 	def apply[A](v: A, nxt: Option[MyList[A]]) =
 		new MyList(v, nxt)
 }
-type YourList[a] = Option[MyList[A]]
+type YourList[a] = Option[MyList[A]] // can be length 0
 
 val t0 = None
 val t1 = Some(new MyList(3, Some(new MyList(4, None))))
@@ -1525,8 +1550,9 @@ class MyTree[A](v: A, lt: Option[MyTree[A]], rt: Option[MyTree[A]]) {
 	val value = v
 	val left = lt
 	val right = rt
-}
-type YourTree[A] = Option[MyTree[A]]
+} // can't be length 0
+
+type YourTree[A] = Option[MyTree[A]] // can be length 0
 
 val t0: YourTree[Int] = None
 val t1: YourTree[Int] = Some(new MyTree(3, None, None))
@@ -1694,7 +1720,7 @@ case class MyNil[A]() extends MyList[A] {
 	def getValue = None
 	def getNext = this
 }
-case Class MyCons[A](val hd: A, val tl: MyList[A])  extends MyList[A] {
+case class MyCons[A](hd: A, tl: MyList[A])  extends MyList[A] {
 	def getValue =Some(hd)
 	def getNext = tl
 }
@@ -1756,7 +1782,7 @@ case class MyCons[A](val hd: A, val tl: MyList[A]) extends MyList[A] {
 }
 ```
 
-### `MyTree <: Iterable` (Try)
+### MyTree <: Iterable (Try)
 ```scala
 sealed abstract class MyTree[A] extends Iterable[A]
 case class Empty[A]() extends MyTree[A] {
@@ -1769,4 +1795,72 @@ case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A
 	// more efficient than "def iter".
 	val iter = MyCons(value, ???(left, right))
 }
+```
+
+### Extend MyList with append
+```scala
+sealed abstract class MyList[A] extends Iter[A] {
+	def append(list: MyList[A]): MyList[A]
+}
+case class MyNil[A]() extends MyList[A] {
+	def getValue = None
+	deg getNext = this
+	def append(lit: MyList[A]) = list
+}
+case class MyCons[A](hd: A, tl: MyList[A]) extends MyList[A] {
+	def getValue = Some(hd)
+	def getNext = tl
+	def append(lst: MyList[A]) = MyCons(hd, tl.append(lst))
+}	
+```
+
+### MyTree <: Iterable
+```scala
+sealed abstract class MyTree[A] extends Iterable[A] {
+	override def iter: MyList[A]
+	/* Note:
+	override def iter: Int // Type Error (no bug in Scala)
+	                       // because not (Int <: Iter[A])
+	*/
+}
+case class Empty[A]() extends MyTree[A] {
+	def iter = MyNil()
+}
+case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A] {
+	val iter = MyCons(value, left.iter.append(right.iter))
+}
+```
+
+### Test
+```scala
+def sumElements(xs: Iter[Int]): Int = 
+	xs.getValue match {
+		case None => 0 
+		case Some(n) => n + sumElements(xs.getNext)
+	}
+
+val t: MyTree[Int] =
+	Node(3, Node(4,Node(2,Empty(),Empty()),
+	Node(3,Empty(),Empty())),
+	Node(5,Empty(),Empty()))
+	
+sumElements(t.iter)
+```
+
+### Iter <: Iterable
+```scala
+abstract class Iterable[A] {
+	def iter: Iter[A]
+}
+
+abstract class Iter[A] extends Iterable[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+	def iter = this
+}
+
+val lst: MyList[Int] =
+	MyCons(3, MyCons(4, MyCons(2, MyNil())))
+
+sumElements(lst.iter)
 ```
