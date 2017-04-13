@@ -1500,6 +1500,15 @@ And implicit sub typing makes programmer understand code.
 
 Class and Structural type always contains `null` value. But it is not type safe. Algebraic datatype 과 class 의 차이: class 는 오직 하나의 constructor field 만 존재한다. 반면 algebraic datatype 은 constructor field의 disjoint union 을 제공한다. `null` value 를 제공하는 이유는 이러한 disjoint union 을 class 에도 비슷하게 나마 제공하기 위함이다?
 
+### Note on Null value
+* `null`: The special element of every calss & structural type
+* This value is needed to construct disjoint union types using classes in Java, which, however, is not as elegant and type safe as algebraic data types (ADTs):
+	* Such disjoint union types can contain junk values (not elegant).
+	* Null-point exception can be raised at run time (not type safe).
+
+* For this reason, it is discouraged to use `null` in Scala although Scala supports `null` for compatibility with Java.
+* Instead, it is encouraged to use ADTs, which themselves are classes and thus take advantaged of both ADT and class. 
+
 ### Simplification using Argument Members
 ```scala
 class MyList[A](v: A, nxt: Option[MyList[A]]) {
@@ -1559,6 +1568,7 @@ val t1: YourTree[Int] = Some(new MyTree(3, None, None))
 val t2: YourTree[Int] = Some(new MyTree(3, Some(new MyTree(4, None, None)), None))
 ```
 
+## 4월 13일
 ## Nominal Sub Typing for Classes
 ### Nominal Sub Typing, a.k.a Inheritance
 ```scala
@@ -1599,13 +1609,37 @@ class gee_type(x: Int) extends foo_type(x+1, x+2) {
 (new gee_type(30)).c
 ```
 
-Q: Can we override with a different type?
+```scala
+def test(f: too_type) = f.f(10)
+test(new gee_type(30))
+``` 
+
+여기서 `gee_type` 의 `f` 를 사용한다. dynamically dispatch, type 이 아니라 value 에 의해 결정된다. 이게 class 가 안좋은 이유다. type 에 의해서 결정되는게 아니라서, table 을 봐서 function call 을 해야한다. structural type 의 경우 `f` 는 하나의 value 이고,  다른 value 가 들어오는 것이 자연스러운 것이다. 교수님의 포인트: class 안에 함수를 정의하는 것이 안좋다.
+
+Q: Can we override `val`?  
+Yes we can! 
+
+```scala
+class gee_type(x: Int) extends foo_type(x+1, x+2) {
+	override val a = x + 100
+	// or, override def f(z: Int) = super.f(z) * 2
+	val c: Int = f(x) + b // f's a is x + 100
+	// val d = a, super is only allowed to def 
+}
+``` 
+
+`val`을 override 해버리면, 그 `val`을 사용하는 `super`에 존재하는 `def`도 바뀐 `val`을 사용하게 된다. 그러나 이것은 `def` 도 마찬가지이다. `def`는 share 될 수 있기 때문에 `super`가 가능하지만, `val`은 모든 객체가 따로 저장해야 하기 때문에 `super`가 불가능하다. 
+
+Q: Can we override with a different type?  
+A: Only return type is subtype. You can not change parameter type. If you want to change parameter type, you need to introduce new field.
 
 ```scala
 override def f(z: Any): Int = 77        // No, arg: diff type (why not sub type?)
-def f(z: Any): Int = 77                 // Yes, arg: diff type
+def f(z: Any): Int = 77                 // Yes, arg: diff type (but this is a overloading not overring)
 override def f(z: Int): Nothing = ???   // Yes, ret: sub type
 ```
+
+override 를 붙여줘야만 한다. Readibility 를 위한 제약. overriding은 constructor 를 바꾸는 것이다.
 
 ### Overriding 2
 ```scala
@@ -1617,9 +1651,10 @@ class foo_type(x: Int, y: Int) {
 
 class gee_type(x: Int) extends foo_type(x+1, x+2) {
 	override def b = 10
+	val c: Int = f(x) + b
 }
 
-(new gee_type(30)).b
+(new gee_type(30)).c // f 의 b 가 10 으로 바뀐다.
 ```
 
 ### Example: My List
@@ -1648,6 +1683,8 @@ val t2: MyList[Int] = MyCons(3, MyNil())
 
 def foo(x: MyList[Int]) = ???
 ```
+
+`null`없이 disjoint union 을 구현할 수 있다.
 
 ### Case Class
 ```scala
