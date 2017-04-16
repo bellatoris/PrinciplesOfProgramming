@@ -1684,7 +1684,7 @@ val t2: MyList[Int] = MyCons(3, MyNil())
 def foo(x: MyList[Int]) = ???
 ```
 
-`null`없이 disjoint union 을 구현할 수 있다.
+`null`없이 disjoint union 을 구현할 수 있다. 그러나 `MyList`는 어떠한 field 도 없기 때문에 할 수 있는 작업이 없다. There is no elimination.
 
 ### Case Class
 ```scala
