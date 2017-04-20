@@ -1691,7 +1691,6 @@ def foo(x: MyList[Int]) = ???
 class MyList[A]() { ... }
 
 case class MyNil[A]() extends MyList[A] { ... }
-
 case class MyCons[A]()(hd: A, tl: MyList[A]) extends MyList[A] { ... }
 
 val t: MyList[Int] = MyCons(3, MyNil())
@@ -1794,7 +1793,7 @@ case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A
 
 Q: Can `MyTree[A]` implement `Iter[A]`?
 
-### Solution: Better Speicifiation
+### Solution: Better Specification
 ```scala
 abstract class Iter[A] {
 	def getValue: Option[A]
@@ -1804,6 +1803,9 @@ abstract class Iter[A] {
 abstract class Iterable[A] {
 	def iter: Iter[A]
 }
+
+def sumElementsGen(xs: Iterable[Int]): Int =
+	sumElements(xs.iter)
 ```
 
 ### Let's Use MyList
@@ -1830,7 +1832,7 @@ case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A
 	// so it can be used in a sub type.
 	// In this example, "val iter" is also
 	// more efficient than "def iter".
-	val iter = MyCons(value, ???(left, right))
+	val iter = MyCons(value, ???(left.iter, right.iter))
 }
 ```
 
@@ -1854,16 +1856,18 @@ case class MyCons[A](hd: A, tl: MyList[A]) extends MyList[A] {
 ### MyTree <: Iterable
 ```scala
 sealed abstract class MyTree[A] extends Iterable[A] {
-	override def iter: MyList[A]
+	// more specific type than just iter
+	def iter: MyList[A]
 	/* Note:
 	override def iter: Int // Type Error (no bug in Scala)
-	                       // because not (Int <: Iter[A])
+	              			// because not (Int <: Iter[A])
 	*/
 }
 case class Empty[A]() extends MyTree[A] {
 	def iter = MyNil()
 }
 case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A] {
+	// we can recursively define iter.
 	val iter = MyCons(value, left.iter.append(right.iter))
 }
 ```
@@ -1881,7 +1885,7 @@ val t: MyTree[Int] =
 	Node(3,Empty(),Empty())),
 	Node(5,Empty(),Empty()))
 	
-sumElements(t.iter)
+sumElementsGen(t)
 ```
 
 ### Iter <: Iterable
@@ -1899,5 +1903,5 @@ abstract class Iter[A] extends Iterable[A] {
 val lst: MyList[Int] =
 	MyCons(3, MyCons(4, MyCons(2, MyNil())))
 
-sumElements(lst.iter)
+sumElementsGen(lst)
 ```
