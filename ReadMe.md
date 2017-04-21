@@ -132,7 +132,7 @@ def square(x: Int) = x * x
 	* Use `=>`
 
 ```scala
-def one(x: Int, y: =>Int) = 1
+def one(x: Int, y: => Int) = 1
 one(1+2, loop) -> 1
 one(loop, 1+2) -> divergence
 ```
@@ -257,13 +257,21 @@ def or(x: Boolean, y: =>Boolean): Boolean = {
 	else y
 }
 
-and(false, loop==1)
-~ if (false) loop==1 else false
+and(false, loop == 1)
+~ if (false) loop == 1 else false
 ~ false
 
-and(true, loop==1)
-~ if (true) loop==1 else false
-~ loop==1 ~ loop==1 ...
+and(true, loop == 1)
+~ if (true) loop == 1 else false
+~ loop == 1 ~ loop == 1 ...
+
+or(true, loop == 1)
+~ if (true) true else loop == 1
+~ true
+
+or(false, loop == 1)
+~ if (false) true else loop == 1
+~ loop == 1 ~ loop == 1 ...
 ```
 
 ### Exercise: square root calculation
@@ -304,7 +312,7 @@ sqrt(2)
 	* `val a = b; val b = a` 이러한 cycle을 만들지 않기 위해서.
 	
 	```scala
-	val a = b    // raise error. a is value, the compiler wants to evalute b. 
+	val a = b    // raise error. a is value, the compiler wants to evaluate b. 
 	val b = 2    // but b defined here. Over the a's scope, so the compiler raises error.
 	
 	def a = b    // call-by-name, it's not evalute right now.
@@ -369,18 +377,18 @@ g(5): [t=0, f=..., g=..., x=25]:[x:5], x*x ~ 5*5 ~ 25
 
 ### Semi-colons and Parenthesis
 * Block 
-	* Can write two definitions/expressions in a single line using `;`
+	* Can write more than two definitions/expressions in a single line using `;`
 	* Can write one definition/expression in two lines using `()`, but can omit `()` when clear
 
 ```scala
 // OK
 val r = {
 	val t = 10; val s = square(5); t +
-	a }
+	s }
 // Not OK
 val r = {
-	val t = 10; val s = sqaure(5); t +
-	s }
+	val t = 10; val s = square(5); t
+	+ s }
 // OK
 val r = {
 	val t = 10; val s = square(5); (t + 
@@ -421,22 +429,22 @@ def f1(c: Boolean, iv: Int): Int = {
 	else iv * iv * iv
 }
 
-f1(true, {println("ok"); 100+100+100+100}) // ok 0f1(false, {println("ok"); 100+100+100+100}) // ok 64000000
+f1(true, { println("ok"); 100+100+100+100 }) // ok 0f1(false, { println("ok"); 100+100+100+100 }) // ok 64000000
 
-def f2(c: Boolean, iv: =>Int): Int = {
+def f2(c: Boolean, iv: => Int): Int = {
 	if (c) 0
 	else iv * iv * iv
 }
 
-f2(true, {println("ok"); 100+100+100+100}) // 0f2(false, {println("ok"); 100+100+100+100}) // ok ok ok 64000000
+f2(true, { println("ok"); 100+100+100+100 }) // 0f2(false, { println("ok"); 100+100+100+100 }) // ok ok ok 64000000
 
-def f3(c: Boolean, i: =>Int): Int = {
+def f3(c: Boolean, i: => Int): Int = {
 	lazy val iv = i
 	if (c) 0
 	else iv * iv * iv
 }
 
-f3(true, {println("ok"); 100+100+100+100}) // 0f3(false, {println("ok"); 100+100+100+100}) // ok 64000000
+f3(true, { println("ok"); 100+100+100+100 }) // 0f3(false, { println("ok"); 100+100+100+100 }) // ok 64000000
 ```
 
 ## Tail Recursion
@@ -500,7 +508,7 @@ def sumCubes(n: Int): Int =
 Q: How to write reusable code? 
 
 ```scala
-def sum(f: Int=>Int, n: Int): Int =	if (n <= 0) 0 else f(n) + sum(f, n-1)
+def sum(f: Int => Int, n: Int): Int =	if (n <= 0) 0 else f(n) + sum(f, n-1)
 	def linear(n: Int) = ndef square(n: Int) = n * ndef cube(n: Int) = n * n * n
 def sumLinear(n: Int) = sum(linear, n)def sumSquare(n: Int) = sum(square, n)def sumCubes(n: Int) = sum(cube, n)
 ```
@@ -517,37 +525,37 @@ def sum(f: Int=>Int, n: Int): Int =	if (n <= 0) 0 else f(n) + sum(f, n-1)
 	ex)
 	
 	```scala
-	(x: Int => x*x)(100) // 10000
+	((x: Int) => x*x)(100) // 10000
 	```  
 	
 ```scala
-def sumLinear(n: Int) = sum((x:Int)=>x, n)def sumSquare(n: Int) = sum((x:Int)=>x*x, n)def sumCubes(n: Int) = sum((x:Int)=>x*x*x, n)
+def sumLinear(n: Int) = sum((x:Int) => x, n)def sumSquare(n: Int) = sum((x:Int) => x*x, n)def sumCubes(n: Int) = sum((x:Int) => x*x*x, n)
 ```Or simply
 
-```scaladef sumLinear(n: Int) = sum((x)=>x, n)def sumSquare(n: Int) = sum((x)=>x*x, n)def sumCubes(n: Int) = sum((x)=>x*x*x, n)
+```scaladef sumLinear(n: Int) = sum((x) => x, n)def sumSquare(n: Int) = sum((x) => x*x, n)def sumCubes(n: Int) = sum((x) => x*x*x, n)
 ```
 
 ### Exercise
 ```scala
-def sum(f: Int=>Int, a: Int, b: Int): Int = 	if (a <= b) f(a) + sum(f, a+1, b) else 0def product(f: Int=>Int, a: Int, b: Int): Int = 
+def sum(f: Int => Int, a: Int, b: Int): Int = 	if (a <= b) f(a) + sum(f, a+1, b) else 0def product(f: Int => Int, a: Int, b: Int): Int = 
 	if (a <= b) f(a) * product(f, a+1, b) else 1
 ```
-DRY (Do not Repeat Yourself) using a higher-order function, called "mapreduce"
+DRY (Do not Repeat Yourself) using a higher-order function, called "mapReduce"
 
 ```scala
-def mapReduce(map: Int=>Int, reduce: (Int, Int)=>Int, a: Int, b: Int, init: Int): Int = 
+def mapReduce(map: Int => Int, reduce: (Int, Int) => Int, a: Int, b: Int, init: Int): Int = 
 	if (a <= b) reduce(map(a), mapReduce(map, reduce, a+1, b, init)
 	else init
 /*	call-by-name map and reduce function
-def mapReduce(map: =>(Int=>Int), reduce: =>((Int, Int)=>Int), a: Int, b: Int, init: Int): Int = 
+def mapReduce(map: => (Int => Int), reduce: => ((Int, Int) => Int), a: Int, b: Int, init: Int): Int = 
 	if (a <= b) reduce(map(a), mapReduce(map, reduce, a+1, b, init)
 	else init
 */
 
-def sum(f: Int=>Int, a: Int, b: Int): Int =
+def sum(f: Int => Int, a: Int, b: Int): Int =
 	mapReduce(f, _+_, a, b, 0)
 
-def product(f: Int=>Int, a: Int, b: Int): Int = 
+def product(f: Int => Int, a: Int, b: Int): Int = 
 	mapReduce(f, _*_, a, b, 1)
 ```
 
@@ -609,7 +617,7 @@ function value는 parameterized expression과 어디서 정의 되었는지 (ori
 ### Example: call by name with closrues
 ```scala
 1: val t = 0
-2: def f(x: =>Int) = t + x // x is treated as x()
+2: def f(x: => Int) = t + x // x is treated as x()
 3: val r = {
 4:     val t = 10
 5:     f(t * t) }          // t*t is treated as () => t*t
@@ -620,7 +628,7 @@ function value는 parameterized expression과 어디서 정의 되었는지 (ori
 ```scala
 [],1 
 ~ [t=0],2 
-~ [...,f=(x:=>Int)t+x],3 
+~ [...,f=(x: => Int)t+x],3 
 ~ [...]:[],4 
 ~ [...]:[t=10],5 
 ~ [...,r=100],65: [t=0,f=...]:[x={[t=0,f=...]:[t=10],()t*t}],t+x 
@@ -679,7 +687,7 @@ def sum(f: Int => Int): (Int, Int) => Int = {
 We can also write as follows.
 
 ```scala
-def sum(f: Int => Int): (Int, Int)=>Int = 
+def sum(f: Int => Int): (Int, Int) => Int = 
 	(a, b) => if (a <= b) f(a) + sum(f)(a+1, b) else 0
 ```
 
@@ -714,7 +722,7 @@ def foo(x: Int, y: Int, z: Int)(a: Int, b: Int): Int =
 // (Int, Int, Int) => Int, automatically conversion
 val f2 = foo(_:Int,1,_:Int)(2, _:Int)
 // (Int, Int) => (Int => Int)val f3 = (x: Int, z: Int) => (b: Int) => foo(x,1,z)(2,b)
-f1(1,2,3)  // 8f2(1,2,3)  // 8f3(1,2)(3) // 8
+f1(1,2,3)  // 9f2(1,2,3)  // 9f3(1,2)(3) // 9
 ```
 
 ### Exercise
