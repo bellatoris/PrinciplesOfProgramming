@@ -25,7 +25,12 @@ object Main {
    Write a map function that applies the given function to all elements of the given IList.
    */
   def map(xs: IList)(f: Int => Int): IList = {
-  
+    @tailrec
+    def nested(acc: IList, xs: IList): IList = xs match {
+      case INil() => reverse(acc)
+      case ICons(hd, tl) => nested(ICons(f(hd), acc), tl)
+    }
+    nested(INil(), xs)
   }
 
   /*
@@ -33,6 +38,13 @@ object Main {
    Write a reverse function that reverses the order of the given IList.
    */
   def reverse(xs: IList): IList = {
+    @tailrec
+    def nested(acc: IList, xs: IList): IList = xs match {
+      case INil() => acc
+      case ICons(hd, tl) => nested(ICons(hd, acc), tl)
+    }
+
+    nested(INil(), xs)
   }
 
   /*
@@ -41,5 +53,10 @@ object Main {
    For each case class Add/Sub/Mul, you may interpret them as
    normal integer operators: +, -, *.
    */
-  def calculate(x: Exp): Int = ???
+  def calculate(x: Exp): Int = x match {
+    case EInt(i) => i
+    case EAdd(lhs, rhs) => calculate(lhs) + calculate(rhs)
+    case ESub(lhs, rhs) => calculate(lhs) - calculate(rhs)
+    case EMul(lhs, rhs) => calculate(lhs) * calculate(rhs)
+  }
 }

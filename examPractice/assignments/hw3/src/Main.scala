@@ -1,6 +1,6 @@
 package pp201701.hw3
 import pp201701.hw3.Data.DataBundle._
-
+import scala.annotation._
 /*
  * ** The submitted code should be runnable. Before upload, you MUST check it
       whether Test.scala runs successfully. Otherwise you may get 0 points for
@@ -36,9 +36,12 @@ object Main {
 
   def emptyStk[A] = MyNil[A]()
 
-  def push[A](stk: Stack[A])(a: A): Stack[A] = ??? // stk
+  def push[A](stk: Stack[A])(a: A): Stack[A] = MyCons(a, stk)
 
-  def pop[A](stk: Stack[A]): Option[(A, Stack[A])] = ??? // stk
+  def pop[A](stk: Stack[A]): Option[(A, Stack[A])] = stk match {
+    case MyNil() => None
+    case MyCons(hd, tl) => Some((hd, tl))
+  }
 
   def pushList[A](seed: Stack[A])(as: List[A]): Stack[A] =
      as.foldLeft(seed)((stk, a) => push(stk)(a))
@@ -54,12 +57,24 @@ object Main {
    */
   def emptyQ[A] = (emptyStk[A], emptyStk[A])
 
-  def enQ[A](q: Queue[A])(a: A): Queue[A] = ??? // q
+  def enQ[A](q: Queue[A])(a: A): Queue[A] = (push(q._1)(a), q._2)
 
   def enQList[A](seed: Queue[A])(as: List[A]): Queue[A] =
      as.foldLeft(seed)((q, a) => enQ(q)(a))
 
-  def deQ[A](q: Queue[A]): Option[(A, Queue[A])] = ??? // None
+  def deQ[A](q: Queue[A]): Option[(A, Queue[A])] = q match {
+    case (MyNil(), MyNil()) => None
+    case (stk1, MyCons(hd, tl)) => Some((hd, (stk1, tl)))
+    case (stk1 @ MyCons(hd, tl), MyNil()) => {
+      @tailrec
+      def nested(stk: Stack[A], acc: Stack[A]): Stack[A] = stk match {
+        case MyNil() => acc
+        case MyCons(hd, tl) => nested(tl, push(acc)(hd))
+      }
+      val (value, newStk) = pop(nested(stk1, MyNil())).get
+      Some((value, (MyNil(), newStk)))
+    }
+  }
 
   /*
    Exercise 2: Binary Search Tree
@@ -85,13 +100,27 @@ object Main {
   def emptyBST[K, V]: BSTree[K, V] = Leaf()
 
   def insert[K, V]
-    (t: BSTree[K, V])(keyValue: (K, V))(cmp: K => K => Int): BSTree[K, V] = ??? // emptyBST
+    (t: BSTree[K, V])(keyValue: (K, V))(cmp: K => K => Int): BSTree[K, V] = 
+    t match {
+    case Leaf() => Node(keyValue, Leaf(), Leaf())
+    case Node(kv, l, r) => 
+      if (keyValue._1 == kv._1) Node(keyValue, l, r)
+      else if (cmp(keyValue._1)(kv._1) > 0) Node(kv, l, insert(r)(keyValue)(cmp))
+      else Node(kv, insert(l)(keyValue)(cmp), r)
+  }
 
   def insertList[K, V]
     (seed: BSTree[K, V])(keyValues: List[(K, V)])(cmp: K => K => Int) =
     keyValues.foldLeft(seed)((tree, keyValue) => insert(tree)(keyValue)(cmp))
 
-  def lookup[K, V](t: BSTree[K, V])(key: K)(cmp: K => K => Int): Option[V] = ??? // None
+  def lookup[K, V](t: BSTree[K, V])(key: K)(cmp: K => K => Int): Option[V] = 
+    t match {
+    case Leaf() => None
+    case Node(kv, l, r) =>
+      if (key == kv._1) Some(kv._2)
+      else if (cmp(key)(kv._1) > 0) lookup(r)(key)(cmp)
+      else lookup(l)(key)(cmp)
+  }
 
   /*
    Exercise 3: Structural Sub Type
@@ -123,13 +152,20 @@ object Main {
      Find suitable common supertype of Ty1 and Ty2,
      and replace "Any" with that type.
      */
-    type CommonTy = Any // Any
+    type CommonTy = {
+      def apply: { val func: { } => { val a: A; val b: B }; val c: C; val e: E } => { val b: B }
+      val a: A
+    }
 
     /*
      Fill in the apply function here.
      The answer should be in this form: x.apply(...)
      */
     def apply(x: CommonTy, _a: A, _b: B, _c: C, _d: D, _e: E, _f: F) =
-      ??? //0
+      x.apply(new {
+        val func = (input: { }) => new { val a = _a; val b = _b }
+        val c = _c
+        val e = _e
+      })
   }
 }

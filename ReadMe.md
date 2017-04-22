@@ -803,7 +803,7 @@ object foo {    // or, val foo = new {
 	val a = 3
 	def b = a + 1
 	def f(x: Int) = b + x
-	def f(x: String) = "hello" + x
+	def f(x: String) = "hello " + x
 }
 
 foo.f(3)
@@ -836,7 +836,7 @@ def g(x: Foo) = {
     x.f(3)
 }
     
-g(foo)
+g(foo)      // 7 same scoping rule
 ```
 
 `def`와 `val`의 차이? 모든 `def`를 `val`로 대체할 수 있나? non-termination이 없다면 `def`와 `val`은 동일하다? 
@@ -870,7 +870,7 @@ val a: () => Int = x    // cannot assign loop
 	```
 Algebraic Datatype을 그냥 class를 사용해서 대체할 수 있지만, algebraic datatype은 pattern matching을 가능하게 해준다. Pattern matching은 elimination의 한 형태 이다.
 
-### Algegraic Datatypes: Recursion
+### Algebraic Datatypes: Recursion
 * Recursive ADT
 	* E.g.
 	
@@ -964,32 +964,31 @@ If fails, ...
 
 ### Advanced Pattern Matching: An Example
 ```scala
-def secondElmt(xs: IList): IOption = 
-	xs match {
+def secondElmt(xs: IList): IOption = xs match {
 		case INil() | ICons(_, INil()) => INone()
 		case ICons(_, ICons(x, _)) => ISome(x)
-	}
+}
 ```
 Vs.
 
-```scaladef secondElmt2(xs: IList) : IOption =  xs match {	case INil() | ICons(_, INil()) => INone() 
+```scaladef secondElmt2(xs: IList): IOption = xs match {	case INil() | ICons(_, INil()) => INone() 
 	case ICons(_, ICons(x, _)) => ISome(x) 
 	case _ => INone()}
 ```
 
 ### Pattern Matching on Int
 ```scala
-def factorial(n: Int) : Int = n match {	case 0 => 1	case _ => n * factorial(n-1) 
-}def fib(n: Int) : Int = n match {	case 0 | 1 => 1	case _ => fib(n-1) + fib(n-2) 
+def factorial(n: Int): Int = n match {	case 0 => 1	case _ => n * factorial(n-1) 
+}def fib(n: Int): Int = n match {	case 0 | 1 => 1	case _ => fib(n-1) + fib(n-2) 
 }
 ```
 
 ### Pattern Matching with If
 ```scala
-def f(n: Int) : Int = n match {	case 0 | 1 => 1 
+def f(n: Int): Int = n match {	case 0 | 1 => 1 
 	case _ if (n <= 5) => 2
 	case _ => 3}
-def f(t: BTree) : Int = t match {	case Leaf() => 0	case Node(n, _, _) if (n <= 10) => 1 
+def f(t: BTree): Int = t match {	case Leaf() => 0	case Node(n, _, _) if (n <= 10) => 1 
 	case Node(_, _, _) => 2}
 ```
 
@@ -1071,7 +1070,7 @@ def t: BTree = Node(5,Node(4,Node(2,Leaf(),Leaf()),Leaf()), Node(7,Node(6,Leaf()
 
 * Why is compile-time type checking for?
 	* Can detect	type errors at compile time. 
-	* Increase Readability (Giva a good abstraction).
+	* Increase Readability (Give a good abstraction).
 	* Soundness: Well-typed programs raise no type errors at run time.
 
 ### Type Checking and Inference
@@ -1116,7 +1115,14 @@ def t: BTree = Node(5,Node(4,Node(2,Leaf(),Leaf()),Leaf()), Node(7,Node(6,Leaf()
 	* The type of `id` is `[A](x: A)A`
 	* `id` is a parametric expression
 	* `id[T] _` is a value of type `T => T` for any type `T`.
-	* There is no polymophic type because of technical reason.
+		* 실험 했을 때는 `Nothing => Nothing` 이 되어 value로 만들 수 없었다.
+
+		```scala
+		def id[A](x: A): A = x
+		val a = id _
+		// a(3)  error
+		```
+	* There is no polymorphic type because of technical reason.
 
 ### Examples
 ```scala
@@ -1125,20 +1131,19 @@ def id[A](x: A) = x
 id(3)
 id("abc")
 
-def applyn[A](f: A => A, n: Int, x: A): A = 
-	n match {
+def applyn[A](f: A => A, n: Int, x: A): A = n match {
 		case 0 => x
 		case _ => f(applyn(f, n - 1, x))
 	}
 	
-applyn((x: Int) => x + 1, ,100, 3)
+applyn((x: Int) => x + 1, 100, 3)
 applyn((x: String) => x + "!", 10, "gil")
 applyn(id[String], 10, "hur")
 
 def foo[A, B](f: A => A, x: (A, B)): (A, B) =
 	(applyn[A](f, 10, x._1), x._2)
 	
-foo[Sting, Int]((x: String) => x + "!", ("abc", 10))
+foo[String, Int]((x: String) => x + "!", ("abc", 10))
 
 def gee[A, B](f: ((A, B)) => (A, B), x: (A, B)): (A, B) = 
 	applyn[(A, B)](f, 10, x)
@@ -1149,11 +1154,10 @@ def gee[A, B](f: ((A, B)) => (A, B), x: (A, B)): (A, B) =
 type Applyn = { def apply[A](f: A => A, n: Int, x: A): A }
 
 object applyn {
-	def apply[A](f: A => A, n: Int, x: A): A = 
-		n match {
+	def apply[A](f: A => A, n: Int, x: A): A = n match {
 			case 0 => x
 			case _ => f(apply(f, n - 1, x))
-		}
+	}
 }
 
 applyn((x: String) => x + "!", 10, "gil")
@@ -1168,6 +1172,13 @@ foo(applyn)
 ```
 
 만약 polymorphic function type을 argument로 넘기고 싶다면, record type으로 만들어서 넘기면 된다.
+
+```scala
+def foo(f[A]: A => A) = {
+}
+```
+
+위와 같은 함수는 존재 할 수 없다.
 
 ### Parametric Polymorphism: Datatypes
 ```scala
@@ -1326,7 +1337,7 @@ greeting(tom)greeting(bob)
 * `T <: S` Every element of `T` **can be used as** that of `S`.
 * Cf. `T` is a subset of `S`. Every element of `T` **is** that of `S`.
 * Why polymorphism? 
-	* A function of type `S => R` can be used as `T => R` for many subtyped of `T` of `S`.
+	* A function of type `S => R` can be used as `T => R` for many subtypes of `T` of `S`.
 	* **Note that** `S => R <: T => R` **when** `T <: S` 
 		* `T <: S` 라면 `S`의 자리에 `T`가 들어가도 된다는 뜻, 그렇다면 `S => R`은 `T`와 `S` 둘다 받을 수 있으므로 `T => R`의 자리에 `S => R`이 들어갈 수 있다.
 	* **Note that** `R => T <: R => S` **when** `T <: S`
@@ -1373,6 +1384,8 @@ greeting(tom)greeting(bob)
 	val b: Any = a
 	def f(a: Nothing): Int = a
 	```
+	
+	`Any` 가 올 곳에는 어떠한 type 이 와도 되고, 어떠한 type 자리 에도 `Nothing` 이 들어갈 수 있다. 
 
 ### Sub Types for Records
 * permutation

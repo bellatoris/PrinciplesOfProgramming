@@ -49,5 +49,22 @@ object Main {
     val f3 = (x: Int, z: Int) => (b: Int) => foo(x, 1, z)(2, b)
     
     println(f3(1, 2)(3))
+
+    {
+      def mapReduce(map: Int => Int)(reduce: (Int, Int) => Int, init: Int)(a: Int, b: Int): Int = {
+        @tailrec
+        def nested(acc: Int, n: Int): Int = {
+          if (n <= b) nested(reduce(map(n), acc), n + 1)
+          else acc
+        }
+        nested(init, a)
+      }
+      
+      def sum = mapReduce(_: Int => Int)(_ + _, 0) _
+      def product = mapReduce(_: Int => Int)(_ * _, 1) _
+
+      println(sum(x => x)(1, 10))
+      println(product(x => x)(1, 3))
+    }
   }
 }
