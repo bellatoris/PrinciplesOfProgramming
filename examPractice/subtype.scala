@@ -24,7 +24,14 @@ object Main {
         val y = s.a
       }
     }
-
+    // foo <: gee
     val gee: { val a: Int; val b: Int; val c: Int } => { val x: Int } = foo _
+
+    type Foo = { val a: Int; val b: Int } => { val x: Int; val y: Int }
+    type Gee = { val a: Int; val b: Int; val c: Int } => { val x: Int }
+
+    def zoo(gee: Gee) = gee
+    println(zoo(gee)(new { val a = 3; val b = 4; val c = 5 }).x)
+    zoo(foo _)
   }
 }

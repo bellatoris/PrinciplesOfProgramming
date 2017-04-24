@@ -37,7 +37,7 @@ object Point {
 * Type은 value들의 집합이다. 
 	* ex) `Int: {-(2^32-1), ..., 2^32-1 }` 
 * Expression은 value와 name, primitive operation의 조합.
-* Name Binding (= Programming)은 expression과 이름을 binding 시키는 것이다. Named은 just idenitifier. Functional Programming에서 name이라 하면 value를 말하는 것, name을 evaluation하면 언제나 같은 결과를 준다. Name never change.
+* Name Binding (= Programming)은 expression과 이름을 binding 시키는 것이다. Name은 just idenitifier. Functional Programming에서 name이라 하면 value를 말하는 것, name을 evaluation하면 언제나 같은 결과를 준다. Name never change.
 	
 	```scala
 	def a = 1 + (2 + 3)
@@ -1134,7 +1134,7 @@ id("abc")
 def applyn[A](f: A => A, n: Int, x: A): A = n match {
 		case 0 => x
 		case _ => f(applyn(f, n - 1, x))
-	}
+}
 	
 applyn((x: Int) => x + 1, 100, 3)
 applyn((x: String) => x + "!", 10, "gil")
@@ -1175,6 +1175,8 @@ foo(applyn)
 
 ```scala
 def foo(f[A]: A => A) = {
+	f[String]("hi")
+	f[Int](3)
 }
 ```
 
@@ -1209,14 +1211,13 @@ sealed abstract class BSTree[A]
 case class Leaf[A]() extends BSTree[A]
 case class Node[A](key: Int, value: A, left: BSTree[A], right: BSTree[A]) extends BSTree[A]
 
-def lookup[A](t: BSTree[A], k: Int): MyOption[A] = 
-	t match {
+def lookup[A](t: BSTree[A], k: Int): MyOption[A] = t match {
 		case Leaf() => MyNone()
 		case Node(key, value, left, right) => 
 			if (k == key) MySome(k)
 			else if (k < key) lookup[A](left, k)
 			else lookup[A](right, k)
-	}
+}
 	
 def t: BSTree[String] =
 	Node(5,"My5", Node(4,"My4",Node(2,"My2",Leaf(),Leaf()),Leaf()), Node(7,"My7",Node(6,"My6",Leaf(),Leaf()),Leaf()))
@@ -1234,14 +1235,13 @@ case class Node[A](value: A, left: BTree[A]=Leaf[A](), right: BTree[A]=Leaf[A]()
 
 type BSTree[A] = BTree[(Int, A)]
 
-def lookup[A](t: BSTree[A], k: Int): MyOption[A] = 
-	t match {
+def lookup[A](t: BSTree[A], k: Int): MyOption[A] = t match {
 		case Leaf() => MyNone()
 		case Node(v, left, right) =>
 			if (k == v._1) MySome(v._2)
 			else if (k < v._1) lookup(left, k)
 			else lookup(right, k)
-	}
+}
 
 def t: BSTree[String] = Node((5,"My5"), Node((4,"My4"),Node((2,"My2"))), Node((7,"My7"), Node((6,"My6"))))
 	
