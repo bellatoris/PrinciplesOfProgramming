@@ -1752,6 +1752,7 @@ t match {
 ### Abstract Class: Specification
 * Abstract Classes
 	* Can be used to abstract away the implementation details.
+	* Does not have constructor.
 
 **Abstract classes for Specification**  
 **Concrete sub-classes for Implementation**
@@ -1893,6 +1894,8 @@ case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A
 }
 ```
 
+코드를 직접 수정 하지 않아도 원하는 기능을 추가하거나 extends 하게 할 수 있다.
+
 ### Test
 ```scala
 def sumElements(xs: Iter[Int]): Int = 
@@ -1909,6 +1912,8 @@ val t: MyTree[Int] =
 sumElementsGen(t)
 ```
 
+## 3월 25일
+
 ### Iter <: Iterable
 ```scala
 abstract class Iterable[A] {
@@ -1918,11 +1923,374 @@ abstract class Iterable[A] {
 abstract class Iter[A] extends Iterable[A] {
 	def getValue: Option[A]
 	def getNext: Iter[A]
-	def iter = this
+	def iter = this    // only for children
 }
 
 val lst: MyList[Int] =
 	MyCons(3, MyCons(4, MyCons(2, MyNil())))
 
 sumElementsGen(lst)
+```
+
+## Wrapper for Inheritance
+### Using a Wrapper Class
+```scala
+abstract class Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+class ListIter[A](val list: List[A]) extends Iter[A] {
+	def getValue = list.headOption
+	def getNext = new ListIter(list.tail)
+}
+```
+
+라이브러리에서 제공하는 `List` 가 `Iter` 를 extends 하게 하고 싶다면 wrapper 를 만들면 된다.
+
+### MyTree Using ListIter
+```scala
+abstract class Iterable[A] {
+	def iter: Iter[A]
+}
+sealed abstract class MyTree[A] extends Iterable[A] {
+	override def iter: ListIter[A]
+}
+case class Empty[A]() extends MyTree[A] {
+	val iter: ListIter[A] = new ListIter(Nil)
+}
+case class Node[A](value: A,
+                   left: MyTree[A]
+                   right: MyTree[A]) extends MyTree[A] {
+	val iter: ListIter[A] = new ListIter(
+		value :: (left.iter.list ++ right.iter.lit))
+}
+```
+
+그러나 사용하기 위해서 unwrap 을 해야하므로 불편함이 있다.
+
+### Test
+```scala
+def sumElements(xs: Iter[Int]): Int = xs.getValue match {
+	case Noen => 0
+	case Some(n) => n + sumElements(xs.getNext)
+}
+def sumElementsGen(xs: Iterable[Int]): Int = 
+	sumElements(xs.iter)
+	
+val t : MyTree[Int] =  Node(3, Node(4,Node(2,Empty(),Empty()),    Node(3,Empty(),Empty())),    Node(5,Empty(),Empty()))
+
+sumElementsGens(t)
+```
+
+## Abstract Classes With Abstract Types
+### Using an Abstract Type
+```scala
+abstract class Iterable[A] {
+	type iter_t    // abstract type
+	def iter: iter_t
+	def getValue(i: iter_t): Option[A]
+	def getNext(i: iter_t): iter_t
+}
+
+def sumElements(xs: Iterable[Int]): Int {
+	def sumElementsIter(i: xs.iter_t): Int = xs.getValue(i) match {
+		case None => 0
+		case Some(n) => n + sumElementsIter(xs.getNext(i))
+	}
+	sumElementsIter(xs.iter)
+}
+```
+
+`Iter` 구현 없이 `Iterable` 을 구현 할 수 있다. 바로 `List` 를 사용가능 하다. Abstract type 은 abstract class 에서만 사용 가능하다.
+
+### MyTree Using ListIter
+```scala
+sealed abstract class MyTree[A] extends Iterable[A] {
+	type iter_t = List[A]
+	def getValue(i: List[A]): Option[A] = i.headOption
+	def getNext(i: List[A]): List[A] = i.tail
+}
+case class Empty[A]() extends MyTree[A] {
+	val iter: List[A] = Nil
+}
+case class Node[A](value: A,
+                   left MyTree[A],
+                   right: MyTree[A]) extends MyTree[A] {
+	val iter = value :: (left.iter ++ right.iter) // Pre-order
+	// val iter = left.iter ++ (value :: right.iter) // In-order
+	// val iter = left.iter ++ (right.iter ++ List(value)) // Post-order
+}
+```
+
+### Test
+```scala
+val t : MyTree[Int] =  Node(3, Node(4,Node(2,Empty(),Empty()),    Node(3,Empty(),Empty())),    Node(5,Empty(),Empty()))
+    sumElements(t)
+```
+
+## Abstract Classes with Arguments
+### Abstract Class with Argument
+```scala
+abstract class Iterable[A](eq: (A, A) => Boolean) {
+	type iter_t
+	def iter: iter_t
+	def getValue(i: iter_t): Option[A]
+	def getNext(i: iter_t): iter_t
+	def hasElement(a: A): Boolean = {
+		def hasElementiter(i: iter_t): Boolean = getValue(i) match {
+			case None => false
+			case Some(n) => 
+				if (eq(a, n)) true
+				else hasElementIter(getNext(i))
+		}
+		hasElementIter(iter)
+	}
+}
+```
+
+The abstract class's arguments are also for thier children.
+
+### MyTree
+```scala
+sealed abstract class MyTree[A](eq: (A, A) => Boolean) extends Iterable[A](eq) {
+	type iter_t = List[A]
+	def getValue(i: List[A]): Option[A] = i.headOption
+	def getNext(i: List[A]): List[A] = i.tail
+}
+case class Empty[A](eq: (A, A) => Boolean) extends MyTree[A](eq) {
+	val iter: List[A] = NIl
+}
+case class Node[A](eq: (A, A) => Boolean,
+                   value: A,
+                   left: MyTree[A]
+                   right: MyTree[A]) extends MyTree[A](eq) {
+	val iter: List[A] = value :: (left.iter ++ right.iter)
+}
+```
+
+### Test
+```scasla
+val leq = (x: Int, y: Int) => x == y
+val lEmpty = Empty(leq)
+def INode(n: Int, t1: MyTree[Int], t2: MyTree[Int]) = Node(leq, n, t1, t2)
+
+val t : MyTree[Int] =  INode(3, INode(4,INode(2,IEmpty,IEmpty),                   INode(3,IEmpty,IEmpty)),           INode(5,IEmpty,IEmpty))
+           sumElements(t)
+t.hasElement(5)
+t.hasElement(10)
+```
+
+## More on Classes
+### Motivating Example
+```scala
+class Primes(val prime: Int, val primes: List[Int]) {
+	def getNext: Primes = { 
+		val p = computeNextPrime(prime + 2)
+		new Primes(p, primes ++ (p :: Nil))
+	}
+	def computeNextPrime(n: Int): Int = 
+		if (primes.forall((p: Int) => n%p != 0)) n
+		else computeNextPrime(n + 2)
+}
+
+def nthPrime(n: Int): Int = {
+	def go(primes: Primes, k: Int): Int = 
+		if (k <= 1) primes.prime
+		else go(primes.getNext, k - 1)
+	if (n == 0) 2 else go(new Primes(3, List(3)), n)
+}
+nthPrime(10000)
+```
+
+n 번째 prime number 를 구하기 위해서, client 에게 필요한 것은 `Prime(2, 2 :: Nil)` 이다. 이 것을 기본적으로 제공해 줄 수 없을까? Client 의 행동을 control 할 수 없을까?
+
+### Multiple Constructor
+```scala
+class Primes(val prime: Int, val primes: List[Int]) { 
+	def this() = this(3, List(3))
+		def getNext: Primes = { 
+		val p = computeNextPrime(prime + 2)
+		new Primes(p, primes ++ (p :: Nil))
+	}
+	def computeNextPrime(n: Int): Int = 
+		if (primes.forall((p: Int) => n%p != 0)) n
+		else computeNextPrime(n + 2)
+}
+
+def nthPrime(n: Int): Int = {
+	def go(primes: Primes, k: Int): Int = 
+		if (k <= 1) primes.prime
+		else go(primes.getNext, k - 1)
+	if (n == 0) 2 else go(new Primes, n)
+}
+nthPrime(10000)
+```
+
+어느정도 해결은 됐지만 client 가 simple constructor 만 사용하게 하고 싶으면 어떻게 해야할까?
+
+### Access Modifiers
+* Access Modifiers
+	* Private: Only the class can access the member
+	* Protected: Only the class and its sub classes can access the member
+
+### Using Access Modifiers
+```scala
+class Primes private (val prime: Int, protected val primes: List[Int]) { 
+	def this() = this(3, List(3))
+		def getNext: Primes = { 
+		val p = computeNextPrime(prime + 2)
+		new Primes(p, primes ++ (p :: Nil))
+	}
+	private def computeNextPrime(n: Int): Int = 
+		if (primes.forall((p: Int) => n%p != 0)) n
+		else computeNextPrime(n + 2)
+}
+
+def nthPrime(n: Int): Int = {
+	def go(primes: Primes, k: Int): Int = 
+		if (k <= 1) primes.prime
+		else go(primes.getNext, k - 1)
+	if (n == 0) 2 else go(new Primes, n)
+}
+nthPrime(10000)
+```
+
+`proctected` 를 추가함으로써 simple constructor 만 public 하게 사용할 수 있다. 실험 결과는 안 그런디...
+
+## Traits for Specification
+### Motivation
+```scala
+abstract class Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+class ListIter[A](list: List[A]) extends Iter[A] {
+	def getValue = list.headOption
+	def getNext = new ListIter(list.tail)
+}
+
+abstract class Dick[K, V](eq: (K, K) => Boolean) {
+	def add(k: K, v: V): Dict[K, V]
+	def find(k: K): Option[V]
+}
+```
+
+Q: How can we extends `ListIter` and impelemnt `Dict`?
+
+### Problems
+* Multiple Inheritance
+	* The famous "diamond problem"
+
+	```scala
+	class A(val a: Int)
+	class B extends A(10)
+	class C extends A(20)
+	class D extends B, C
+	```
+	Q: What is the value of `(new D).a`?
+	
+### Traits to the rescue!
+* Traits 
+	* Are the same as abstract classes
+	* But, have only one constructor with no arguments
+
+### Specification using Traits
+```scala
+trait Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+// abstract class Dick[K, V](eq: (K, K) => Boolean) {
+//     def add(k: K, v: V): Dict[K, V]
+//     def find(k: K): Option[V]
+// }
+
+trait Dict[K, V] {
+	def equals(k1: K, k2: K): Boolean
+	def add(k: K, v: V): Dict[K, V]
+	def find(k: K): Option[V]
+}
+```
+
+### Implementing Traits
+```scala
+class ListIter[A](list: List[A]) extends Iter[A] {
+	def getValue = list.headOption
+	def getNext = new ListIter(list.tail)
+}
+
+class ListIterDict[K, V](eq: (K, K) => Boolean, 
+                         list: List[(K, V)]) extends ListIter[(K, V)](list)
+                                             with Dict[K, V] {
+    def equals(k1: K, k2: K) = eq(k1, k2)
+    def add(k: K, v: V) = new ListIterDict(eq, (k, v) :: list)
+    def find(k: K): Option[V] = {
+    	def go(l: List[(K, V)]): Option[V] = l match {
+    		case Nil => None
+    		case (k1, v1) :: tl => 
+    			if (equals(k, k1)) Some(v1) else go(t1) 
+    	}
+    go(list)
+    }
+}
+```
+
+## Mixin with Traits
+### Motivation: Mixin Functionality
+```scala
+trait Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+calss ListIter[A](val list: List[A]) extends Iter[A] {
+	def getValue = list.headOption
+	def getNext: Iter[A] = new ListIter(list.tail)
+}
+
+trait MRIter[A] extends Iter[A] {
+	def mapReduce[B, C](combine: (B, C) => C, ival: C, f: A => B): C =???
+}
+```
+
+### Mixin Composition
+```scala
+trait MRIter[A] extends Iter[A] {
+	override def getNext: MRIter[A]
+	def mapReduce[B, C](combine: (B, C) => C, ival: C, f: A => B): C = getValue match {
+		case None => ival
+		case Some(v) => combine(f(v), getNext.mapReduce(combine, ival, f))
+	}
+}
+
+class MRListIter[A](val list: List[A]) extends ListIter(list) with MRIter[A] {
+	override def getNext: MRIter[A] = new MRListIter(list.tail)
+}
+
+val mr = new MRListIter[Int](List(3, 4, 5))
+mr.mapReduce[Int, Int]((b, c) => b + c, 0, a => a * a)
+```
+
+### Mixin Composition: A Better Way
+```scala
+trait MRIter[A] extends Iter[A] {
+	def mapReduce[B, C](combine: (B, C) => C, ival: C, f: A => B): C = {
+		def go(c: Iter[A]): C = c.getValue match {
+			case None => ival
+			case Some(v) => combine(f(v), go(c.getNext))
+		}
+		go(this)
+	}
+}
+
+class MRListIter[A](list: List[A]) extends ListIter(iter) with MRIter[A]
+
+val mr = new MRListIter[Int](List(3, 4, 5))
+
+// or, val mr = new ListIter(List(3, 4, 5)) with MRIter[Int]
+
+mr.mapReduce[Int, Int]((b, c) => b + c, 0, a => a * a)
 ```
