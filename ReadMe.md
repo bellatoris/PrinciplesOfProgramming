@@ -2138,7 +2138,7 @@ nthPrime(10000)
 ```scala
 class Primes private (val prime: Int, protected val primes: List[Int]) { 
 	def this() = this(3, List(3))
-		def getNext: Primes = { 
+	def getNext: Primes = { 
 		val p = computeNextPrime(prime + 2)
 		new Primes(p, primes ++ (p :: Nil))
 	}
@@ -2156,7 +2156,7 @@ def nthPrime(n: Int): Int = {
 nthPrime(10000)
 ```
 
-`proctected` 를 추가함으로써 simple constructor 만 public 하게 사용할 수 있다. 실험 결과는 안 그런디...
+`private` 를 추가함으로써 User 가 잘못 사용할 수 없게 만들 수 있다.
 
 ## Traits for Specification
 ### Motivation
@@ -2166,7 +2166,7 @@ abstract class Iter[A] {
 	def getNext: Iter[A]
 }
 
-class ListIter[A](list: List[A]) extends Iter[A] {
+class ListIter[A](val list: List[A]) extends Iter[A] {
 	def getValue = list.headOption
 	def getNext = new ListIter(list.tail)
 }
@@ -2213,7 +2213,13 @@ trait Dict[K, V] {
 	def add(k: K, v: V): Dict[K, V]
 	def find(k: K): Option[V]
 }
+
+det test(d: Dict[Int, String]) = {
+	d.add(5, "five").find(5)
+}
 ```
+
+trait 은 argument 를 받을 수 없지만, 받지 않고 method 로 들고 있는 것과 별 차이가 없다.
 
 ### Implementing Traits
 ```scala
@@ -2246,7 +2252,7 @@ trait Iter[A] {
 	def getNext: Iter[A]
 }
 
-calss ListIter[A](val list: List[A]) extends Iter[A] {
+class ListIter[A](val list: List[A]) extends Iter[A] {
 	def getValue = list.headOption
 	def getNext: Iter[A] = new ListIter(list.tail)
 }
@@ -2255,6 +2261,8 @@ trait MRIter[A] extends Iter[A] {
 	def mapReduce[B, C](combine: (B, C) => C, ival: C, f: A => B): C =???
 }
 ```
+
+`mapReduce` 를 가지고 있는 `ListIter` 를 만들고 싶다.
 
 ### Mixin Composition
 ```scala
@@ -2267,12 +2275,14 @@ trait MRIter[A] extends Iter[A] {
 }
 
 class MRListIter[A](val list: List[A]) extends ListIter(list) with MRIter[A] {
-	override def getNext: MRIter[A] = new MRListIter(list.tail)
+	override def getNext: MRIter[A] = new MRListIter(list.tail)    // ugly part
 }
 
 val mr = new MRListIter[Int](List(3, 4, 5))
 mr.mapReduce[Int, Int]((b, c) => b + c, 0, a => a * a)
 ```
+
+`getNext` 의 ambiguity 를 어떻게 제거 할까?
 
 ### Mixin Composition: A Better Way
 ```scala
