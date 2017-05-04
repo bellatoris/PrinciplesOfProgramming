@@ -2171,7 +2171,7 @@ class ListIter[A](val list: List[A]) extends Iter[A] {
 	def getNext = new ListIter(list.tail)
 }
 
-abstract class Dick[K, V](eq: (K, K) => Boolean) {
+abstract class Dict[K, V](eq: (K, K) => Boolean) {
 	def add(k: K, v: V): Dict[K, V]
 	def find(k: K): Option[V]
 }
@@ -2194,28 +2194,59 @@ Q: How can we extends `ListIter` and impelemnt `Dict`?
 ### Traits to the rescue!
 * Traits 
 	* Are the same as abstract classes
-	* But, have only one constructor with no arguments
+	* But, have only one constructor with no **arguments**
+		* Arguments 가 있다면 diamond 상황에서 어떤 argument 를 사용해서 constructor 를 call 해야 할지 ambiguity 가 생긴다. 
+	* trait 에서의 dimaond problem 은 ordering 을 통해서 해결한다. 모든 constructor 는 한 번만 불린다.
+	
+```scala
+object Main {
+  // A -> B -> E -> C -> F -> D
+  def main(args: Array[String]): Unit = {
+    class A {
+      println("I'm A")
+    }
+
+    class B extends A {
+      println("I'm B")
+    }
+
+    trait E {
+      println("I'm E")
+      def hi = println("hi E")
+    }
+
+    trait C extends A with E {
+      println("I'm C")
+      override def hi = println("hi C")
+    }
+
+    trait F extends E {
+      println("I'm F")
+      override def hi = println("hi F")
+    }
+
+    class D extends B with C with F {
+      println("I'm D")
+      override def hi = println("hi E")
+    }
+
+    val d = new D
+    d.hi
+  }
+}
+```
+`hi` 는 `D` 의 `hi` 가 불리었다. `D` 의 `hi` 를 지우면, `F` 의 `hi` 가 불린다. 마지막으로 방문한 constructor 의 method 가 불리는 듯
 
 ### Specification using Traits
 ```scala
-trait Iter[A] {
-	def getValue: Option[A]
-	def getNext: Iter[A]
-}
-
-// abstract class Dick[K, V](eq: (K, K) => Boolean) {
+// abstract class Dick[K, V] {
 //     def add(k: K, v: V): Dict[K, V]
 //     def find(k: K): Option[V]
 // }
 
 trait Dict[K, V] {
-	def equals(k1: K, k2: K): Boolean
 	def add(k: K, v: V): Dict[K, V]
 	def find(k: K): Option[V]
-}
-
-det test(d: Dict[Int, String]) = {
-	d.add(5, "five").find(5)
 }
 ```
 
@@ -2223,25 +2254,37 @@ trait 은 argument 를 받을 수 없지만, 받지 않고 method 로 들고 있
 
 ### Implementing Traits
 ```scala
-class ListIter[A](list: List[A]) extends Iter[A] {
-	def getValue = list.headOption
-	def getNext = new ListIter(list.tail)
-}
-
 class ListIterDict[K, V](eq: (K, K) => Boolean, 
                          list: List[(K, V)]) extends ListIter[(K, V)](list)
                                              with Dict[K, V] {
-    def equals(k1: K, k2: K) = eq(k1, k2)
     def add(k: K, v: V) = new ListIterDict(eq, (k, v) :: list)
     def find(k: K): Option[V] = {
     	def go(l: List[(K, V)]): Option[V] = l match {
     		case Nil => None
     		case (k1, v1) :: tl => 
-    			if (equals(k, k1)) Some(v1) else go(t1) 
+    			if (eq(k, k1)) Some(v1) else go(t1) 
     	}
     go(list)
     }
 }
+```
+
+### Test 
+```scala
+def sumElements[A](f: A => Int)(xs: Iter[A]): Int = xs.getValue match {
+	case None => 0 
+	case Some(n) => f(n) + sumElements(f)(xs.getNext)
+}
+
+def find3(d: Dict[Int, String]) = {
+	d.find(3)
+}
+
+val d0 = new ListIterDict[Int, String]((x, y) => x == y, Nil)
+val d1 = d0.add(4, "four").add(3, "three")
+
+sumElements[(Int, String)](x => x._1)(d)
+find3(d)
 ```
 
 ## Mixin with Traits
@@ -2252,7 +2295,7 @@ trait Iter[A] {
 	def getNext: Iter[A]
 }
 
-class ListIter[A](val list: List[A]) extends Iter[A] {
+class ListIter[A](list: List[A]) extends Iter[A] {
 	def getValue = list.headOption
 	def getNext: Iter[A] = new ListIter(list.tail)
 }
@@ -2274,7 +2317,7 @@ trait MRIter[A] extends Iter[A] {
 	}
 }
 
-class MRListIter[A](val list: List[A]) extends ListIter(list) with MRIter[A] {
+class MRListIter[A](list: List[A]) extends ListIter(list) with MRIter[A] {
 	override def getNext: MRIter[A] = new MRListIter(list.tail)    // ugly part
 }
 
@@ -2282,7 +2325,7 @@ val mr = new MRListIter[Int](List(3, 4, 5))
 mr.mapReduce[Int, Int]((b, c) => b + c, 0, a => a * a)
 ```
 
-`getNext` 의 ambiguity 를 어떻게 제거 할까?
+`getNext` 의 ambiguity 를 어떻게 제거 할까? Ordering 을 이용해서 제거함. 가장 마지막에 불린 constructor 의 method 를 사용함.
 
 ### Mixin Composition: A Better Way
 ```scala
@@ -2303,4 +2346,275 @@ val mr = new MRListIter[Int](List(3, 4, 5))
 // or, val mr = new ListIter(List(3, 4, 5)) with MRIter[Int]
 
 mr.mapReduce[Int, Int]((b, c) => b + c, 0, a => a * a)
+```
+
+## Stacking with Traits
+### Typcial Hierarchy in Scala
+![stack](Images/stack.png)
+
+* **BASE**: Interface (trait or abstract class)
+* **CORE**: Functionality (trait or concrete class)
+* **CUSTOM**: Modifications (each in separate, composable trait)
+
+### IntStack: BAse
+* **BASE**
+
+```scala
+trait IntStack {
+	def get(): (Int, IntStack)
+	def put(x: Int): IntStack
+}
+```
+
+### IntStack: Core
+* **CORE**
+
+```scala
+class BasicIntStack protected (xs: List[Int]) extends IntStack {
+	def this() = this(Nil)
+	protected def mkStack(xs: List[Int]): IntStack = new BasicIntStack(xs)
+	def get(): (Int, IntStack) = (xs.head, mkStack(xs.tail))
+	def put(x: Int): IntStack = mkStack(x :: xs)
+}
+
+val s0 = new BasicIntStack()
+val s1 = s0.pu(3)
+val s2 = s1.put(-2)
+val s3 = s2.put(4)
+val (v1, s4) = s3.get()
+val (v2, s5) = s4.get()
+```
+
+### IntStack: Custom Modifications
+* **CUSTOM**
+
+```scala
+trait Doubling extends IntStack {
+	abstract override def put(x: Int): IntStack = super.put(2 * x)
+}
+
+trait Incrementing extends IntStack {
+	abstract override def put(x: Int): IntStack = super.put(x + 1)
+}
+
+trait Filtering extends IntStack {
+	abstract override def put(x: Int): IntStack =
+		if (x >= 0) super.put(x) else this
+}
+```
+
+### IntStack: Stacking 
+* **Stacking**
+
+```scala
+class DIFIntStack protected (xs: List[Int]) extends BasicIntStack(xs)
+                                            with Doubling
+                                            with Incrementing
+                                            with Filtering {
+	def this() = this(Nil)
+	override def mkStack(xs: List[Int]): IntStack = 
+		new DIFIntStack(xs)
+}
+
+val s0 = new DIFIntStack()
+val s1 = s0.put(3)
+val s2 = s1.put(-2)
+val s3 = s2.put(4)
+val (v1, s4) = s3.get()
+val (v2, s5) = s4.get()
+```
+
+## Subtypes for Traits
+### Exampels
+```scala
+class DIFIntStack protected (xs: List[Int]) extends BasicIntStack(xs)
+                                            with Doubling
+                                            with Incrementing
+                                            with Filtering {
+	def this() = this(Nil)
+	override def mkStack(xs: List[Int]): IntStack = 
+		new DIFIntStack(xs)
+}
+
+val s0 = new DIFIntStack()
+val t0: Incrementing with Doubling = s0
+val t1: Incrementing with BasicIntStack = s0
+```
+
+### Subtype Relation for "with"
+The subtype relation for "with" is structural, not nominal, because we cannot use "with" recursively.
+
+* Permutation
+
+	```scala
+	==================================================
+	... with T1 with T2 ... <: ... with T2 with T1 ...
+	```
+	
+* Width
+
+	```scala
+	=========================
+	... with T ... <: ... ...
+	```
+	
+* Depth
+
+	```scala
+	             T <: S
+	================================
+	... with T ... <: ... with S ...
+	```
+
+# Part 3 - Type-Oriented Programming
+## Subtype & Parametric Polymorphism
+### Subtype & Parametric Polymorphism
+* Subtype Polymorphism
+	* Specification & Implementation 
+* Parametric Polymorphism
+	* DRY (Generic Programming)
+* Specification over Parameter Types
+	* Precise Spec
+* Parameter Types over Specification
+	* More DRY
+
+We will see a better way of doing Spec & Impl later.   
+
+### Subtype Polymorphism
+```scala
+trait Ord {
+	// this cmp that < 0 iff this < that
+	// this cmp that > 0 iff this > that
+	// this cmp that == 0 iff this == that
+	def cmp(that: Ord): Int 
+	
+	def ===(that: Ord): Boolean = (this.cmp(that)) == 0
+	def <(that: Ord): Boolean = (this cmp that) < 0
+	def >(that: Ord): Boolean = (this cmp that) > 0
+	def <=(that: Ord): Boolean = (this cmp that) <= 0
+	def >=(that: Ord): Boolean = (this cmp that) >= 0
+}
+
+def max3(a: Ord, b: Ord, c: Ord): Ord = 
+	if (a <= b) { if (b <= c) c else c }
+	else        { if (b <= c) c else b }
+```
+
+Problem: hard (almost impossible) to define `OrdInt <: Ord`
+
+### Specification over Parameter Types
+```scala
+trait Ord[A] {
+	def cmp(that: Ord[A]): Int
+	def getValue: A
+	
+	def ===(that: Ord[A]): Boolean = (this.cmp(that)) == 0
+	def <(that: Ord[A]): Boolean = (this cmp that) < 0
+	def >(that: Ord[A]): Boolean = (this cmp that) > 0
+	def <=(that: Ord[A]): Boolean = (this cmp that) <= 0
+	def >=(that: Ord[A]): Boolean = (this cmp that) >= 0
+}
+
+def max3[A](a: Ord[A], b: Ord[A], c: Ord[A]): Ord[A] = 
+	if (a <= b) { if (b <= c) c else b }
+	else        { if (a <= c) c else a }
+	
+class OInt(val getInt: Int) extends Ord[OInt] {
+	def cmp(that: Ord[OInt]) = getInt.compare(that.getValue.getInt)
+	def getValue = this
+}
+
+max3(new OInt(3), new OInt(2), new OInt(10)).getValue.getInt
+```
+
+### Further example: Ordered Bag
+```scala
+class Bag[A <: Ord[A]] protected (val toList: List[A]) {
+	def this() = this(Nil)
+	def add(x: A): Bag[A] = {
+		def go(elmts: List[A]): List[A] = elmts match {
+			case Nil => x :: Nil
+			case e :: _ if (x < 3) => x :: elmts
+			case e :: _ if (x === 3) => elmts
+			case e :: rest => e :: go(rest)
+		}
+		new Bag(go(toList))
+	}
+}
+val emp = new Bag[OInt]()
+val b = emp.add(new OInt(3)).add(new OInt(2)).add(new OInt(10))
+b.toList.map((x) => x.getInt)
+```
+
+Works, but very awkward
+
+## Type-Oriented Programming
+### Type-Oriented Programming using Implicit 
+* Ideas from Type Classes
+	* Objected-Oriented: Associate functionality with data (Bad)
+	* Type-Oriented: Associate functionality with types (Good) 
+* How to do Type-Oriented Programming
+	* Separate functionality from data
+	* Find the associated functionality for a given type using "implicit"
+* Implicit
+	* An argument is given "implicitly" 
+
+```scala
+def foo(s: String)(implicit t: String) = s + t
+implicit val exclamation: String = "!!!!!!"
+foo("Hi")        // Hi!!!!!!
+foo("Hi")("???") // Hi??? possible to give it explicitly
+```	 
+
+## Type Classes
+### Completely Separating Ord from Int
+```scala
+abstract class Ord[A] {
+	def cmp(me: A, you: A): Int 
+	
+	def ===(me: A, you: A): Boolean = cmp(me, you) == 0
+	def <(me: A, you: A): Boolean = cmp(me, you) < 0
+	def >(me: A, you: A): Boolean = cmp(me, you) > 0
+	def <=(me: A, you: A): Boolean = cmp(me, you) <= 0
+	def >=(me: A, you: A): Boolean = cmp(me, you) >= 0
+```
+
+### Bag Example
+```scala
+class Bag[A] protected (val toList: List[A])(implicit proxy: Ord[A]) {
+	def this()(implicit proxy: Ord[A]) = this(Nil)(proxy)
+	
+	def add(x: A): Bag[A] = {
+		def go(elmts: List[A]): List[A] = elmts match {
+			case Nil => x :: Nil
+			case e :: _ if (proxy.<(x, e)) => x :: elmts
+			case e :: _ if (proxy.===(x, e)) => elmts
+			case e :: rest => e :: go(rest)
+		}
+		new Bag(go(toList))
+	}
+}
+implicit val intProxy: Ord[Int] = new Ord[Int] { def cmp(me: Int, you: Int) = me.compare(you) }
+
+(new Bag[Int]()).add(3).add(2).add(10).toList
+```
+
+### Context Bound: Syntatic Sugar
+```scala
+// class Bag[A] protected (val toList: List[A])(implicit proxy: Ord[A])
+class Bag[A: Ord] protected (val toList: List[A]) {
+	val proxy = implicitly[Ord[A]]
+	// def this()(implicit proxy: Ord[A]) = this(Nil)(proxy)
+	def this() = this(Nil)
+	
+	def add(x: A): Bag[A] = {
+		def go(elmts: List[A]): List[A] = elmts match {
+			case Nil => x :: Nil
+			case e :: _ if (proxy.<(x, e)) => x :: elmts
+			case e :: _ if (proxy.===(x, e)) => elmts
+			case e :: rest => e :: go(rest)
+		}
+		new Bag(go(toList))
+	}
+}
 ```
