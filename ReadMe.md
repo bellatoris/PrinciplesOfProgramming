@@ -2158,28 +2158,8 @@ nthPrime(10000)
 
 `private` 를 추가함으로써 User 가 잘못 사용할 수 없게 만들 수 있다.
 
-## Traits for Specification
-### Motivation
-```scala
-abstract class Iter[A] {
-	def getValue: Option[A]
-	def getNext: Iter[A]
-}
-
-class ListIter[A](val list: List[A]) extends Iter[A] {
-	def getValue = list.headOption
-	def getNext = new ListIter(list.tail)
-}
-
-abstract class Dict[K, V](eq: (K, K) => Boolean) {
-	def add(k: K, v: V): Dict[K, V]
-	def find(k: K): Option[V]
-}
-```
-
-Q: How can we extends `ListIter` and impelemnt `Dict`?
-
-### Problems
+## Traits for Multiple Inheritance
+### Multiple Inheritance Problems
 * Multiple Inheritance
 	* The famous "diamond problem"
 
@@ -2189,14 +2169,25 @@ Q: How can we extends `ListIter` and impelemnt `Dict`?
 	class C extends A(20)
 	class D extends B, C
 	```
-	Q: What is the value of `(new D).a`?
+	Problem 1: What is the value of `(new D).a`?  
+	Problem 2: The constructor of `A` must be executed once becuase `A` may contain side effects such as sending messages over the network.
 	
-### Traits to the rescue!
+### Java's Solution: Interface
+* Interface
+	* An interface cannot contain any implementation but only types of its methods.
+	* A class can inherit implementations from only one parent class but implement multiple interfaces. 
+	
+### Scala's Solution: Trait
 * Traits 
-	* Are the same as abstract classes
-	* But, have only one constructor with no **arguments**
-		* Arguments 가 있다면 diamond 상황에서 어떤 argument 를 사용해서 constructor 를 call 해야 할지 ambiguity 가 생긴다. 
-	* trait 에서의 dimaond problem 은 ordering 을 통해서 해결한다. 모든 constructor 는 한 번만 불린다.
+	* A trait can implement any of its methods, but should have only one constructor with no arguments.
+	* A trait can 
+		* "**extend**" only one trait or (abstract) class with no arguments 
+		* "**with**" multiple traits.
+	* An (abstract) class can
+		* "**extends**" only one trait or (abstract) class with any arguments
+		* "**with**" multiple traits.   
+
+	Arguments 가 있다면 diamond 상황에서 어떤 argument 를 사용해서 constructor 를 call 해야 할지 ambiguity 가 생긴다. Trait 에서의 dimaond problem 은 ordering 을 통해서 해결한다. 모든 constructor 는 한 번만 불린다.
 	
 ```scala
 object Main {
@@ -2236,6 +2227,71 @@ object Main {
 }
 ```
 `hi` 는 `D` 의 `hi` 가 불리었다. `D` 의 `hi` 를 지우면, `F` 의 `hi` 가 불린다. 마지막으로 방문한 constructor 의 method 가 불리는 듯
+
+### Example
+```scala
+class A(val a: Int) {
+	def this() = this(0)
+}
+trait B {
+	def f(x: Int): Int = x
+}
+// C 가 A 를 상속 했으므로 C 를 사용하기 위해서는 무조건 먼저 A 를 상속해야 한다.
+trait C extends A with B {    
+	def g(x: Int): Int = x + a
+}
+trait D extends B {
+	def h(x: Int): Int = f(x + 50)
+}
+class E extends A(10) with C with D {
+	override def f(x: Int) = x * a
+}
+
+val e = new E
+```
+
+### Algorithm for Multiple Inheritance
+* Algorithm
+	* Give a linear order among all ancestors by "post-order" traversing without revisiting the same node.
+	* Invoke the constructors once in that order.
+
+N.B. Post-order traversal of a class C means 
+
+* Recursively post-order traverse C's first parent;
+* ...
+* Recursively post-order traverse C's last parent; and 
+* Visit C.
+
+By post-order traversing from `D` in the previous example, we have the order: `A(10) -> B -> C -> D -> E`
+
+```scala
+val e = new E
+e.a // 10
+e.f(100) // 100 * 10
+e.g(100) // 100 + 10
+e.h(100) // (100 + 50) * 10, f is overrided
+```
+
+## A Simple Example With Traits
+### Motivation
+```scala
+abstract class Iter[A] {
+	def getValue: Option[A]
+	def getNext: Iter[A]
+}
+
+class ListIter[A](val list: List[A]) extends Iter[A] {
+	def getValue = list.headOption
+	def getNext = new ListIter(list.tail)
+}
+
+abstract class Dict[K, V](eq: (K, K) => Boolean) {
+	def add(k: K, v: V): Dict[K, V]
+	def find(k: K): Option[V]
+}
+```
+
+Q: How can we extends `ListIter` and impelemnt `Dict`?
 
 ### Specification using Traits
 ```scala
@@ -2417,9 +2473,9 @@ class DIFIntStack protected (xs: List[Int]) extends BasicIntStack(xs)
 }
 
 val s0 = new DIFIntStack()
-val s1 = s0.put(3)
+val s1 = s0.put(3)    // 8
 val s2 = s1.put(-2)
-val s3 = s2.put(4)
+val s3 = s2.put(4)    // 10
 val (v1, s4) = s3.get()
 val (v2, s5) = s4.get()
 ```
