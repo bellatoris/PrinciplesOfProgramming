@@ -1912,7 +1912,7 @@ val t: MyTree[Int] =
 sumElementsGen(t)
 ```
 
-## 3월 25일
+## 4월 25일
 
 ### Iter <: Iterable
 ```scala
@@ -2412,7 +2412,7 @@ mr.mapReduce[Int, Int]((b, c) => b + c, 0, a => a * a)
 * **CORE**: Functionality (trait or concrete class)
 * **CUSTOM**: Modifications (each in separate, composable trait)
 
-### IntStack: BAse
+### IntStack: Base
 * **BASE**
 
 ```scala
@@ -2434,7 +2434,7 @@ class BasicIntStack protected (xs: List[Int]) extends IntStack {
 }
 
 val s0 = new BasicIntStack()
-val s1 = s0.pu(3)
+val s1 = s0.put(3)
 val s2 = s1.put(-2)
 val s3 = s2.put(4)
 val (v1, s4) = s3.get()
@@ -2633,6 +2633,7 @@ abstract class Ord[A] {
 	def >(me: A, you: A): Boolean = cmp(me, you) > 0
 	def <=(me: A, you: A): Boolean = cmp(me, you) <= 0
 	def >=(me: A, you: A): Boolean = cmp(me, you) >= 0
+}
 ```
 
 ### Bag Example
