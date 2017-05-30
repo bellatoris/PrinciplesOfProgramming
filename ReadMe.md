@@ -2480,25 +2480,35 @@ val (v1, s4) = s3.get()
 val (v2, s5) = s4.get()
 ```
 
-## Subtypes for Traits
-### Exampels
-```scala
-class DIFIntStack protected (xs: List[Int]) extends BasicIntStack(xs)
-                                            with Doubling
-                                            with Incrementing
-                                            with Filtering {
-	def this() = this(Nil)
-	override def mkStack(xs: List[Int]): IntStack = 
-		new DIFIntStack(xs)
-}
+## Intersection Types
+* Typing Rule
 
-val s0 = new DIFIntStack()
-val t0: Incrementing with Doubling = s0
-val t1: Incrementing with BasicIntStack = s0
-```
+	```scala
+	t1: T1   t: T2
+	==============
+	t1: T1 with T2
+	```
+	
+* Example
+
+	```scala
+	trait A { val a: Int = 0 }
+	triat B { val b: Int = 0 }
+	class C extends A with B {
+		override val a = 10
+		override val b = 20
+		val c = 30
+	}
+	
+	val x = new C
+	val y: A with B = x
+	y.a // 10
+	y.b // 20
+	y.c // type error
+	```
 
 ### Subtype Relation for "with"
-The subtype relation for "with" is structural, not nominal, because we cannot use "with" recursively.
+The subtype relation for "with" is structural.
 
 * Permutation
 
@@ -2523,18 +2533,38 @@ The subtype relation for "with" is structural, not nominal, because we cannot us
 	```
 
 # Part 3 - Type-Oriented Programming
-## Subtype & Parametric Polymorphism
-### Subtype & Parametric Polymorphism
-* Subtype Polymorphism
-	* Specification & Implementation 
-* Parametric Polymorphism
-	* DRY (Generic Programming)
-* Specification over Parameter Types
-	* Precise Spec
-* Parameter Types over Specification
-	* More DRY
 
-We will see a better way of doing Spec & Impl later.   
+### OOP vs TOP
+* OOP (Object-Oriented Programming)
+
+	```scala
+	class DF {
+		val x: D1
+		val y: D2
+		def f(i: I1): O1
+		def g(i: I2): O2
+	}
+	```
+	
+	* Associate functionality with data
+* TOP (Type-Oriented Programming)
+
+	```scala
+	class D {
+		val x: D1
+		val y: D2
+	}
+	class F {
+		def f(d: D)(i: I1): O1
+		def g(d: D)(i: I2): O2
+	}
+	```
+	
+	* Associate functionality with types
+	* Separate functionality from data
+	* TOP is particularly useful for writing specifications!
+
+## Specifications over Parameter Types
 
 ### Subtype Polymorphism
 ```scala
@@ -2590,8 +2620,8 @@ class Bag[A <: Ord[A]] protected (val toList: List[A]) {
 	def add(x: A): Bag[A] = {
 		def go(elmts: List[A]): List[A] = elmts match {
 			case Nil => x :: Nil
-			case e :: _ if (x < 3) => x :: elmts
-			case e :: _ if (x === 3) => elmts
+			case e :: _ if (x < e) => x :: elmts
+			case e :: _ if (x === e) => elmts
 			case e :: rest => e :: go(rest)
 		}
 		new Bag(go(toList))
@@ -2603,24 +2633,6 @@ b.toList.map((x) => x.getInt)
 ```
 
 Works, but very awkward
-
-## Type-Oriented Programming
-### Type-Oriented Programming using Implicit 
-* Ideas from Type Classes
-	* Objected-Oriented: Associate functionality with data (Bad)
-	* Type-Oriented: Associate functionality with types (Good) 
-* How to do Type-Oriented Programming
-	* Separate functionality from data
-	* Find the associated functionality for a given type using "implicit"
-* Implicit
-	* An argument is given "implicitly" 
-
-```scala
-def foo(s: String)(implicit t: String) = s + t
-implicit val exclamation: String = "!!!!!!"
-foo("Hi")        // Hi!!!!!!
-foo("Hi")("???") // Hi??? possible to give it explicitly
-```	 
 
 ## Type Classes
 ### Completely Separating Ord from Int
@@ -2634,7 +2646,32 @@ abstract class Ord[A] {
 	def <=(me: A, you: A): Boolean = cmp(me, you) <= 0
 	def >=(me: A, you: A): Boolean = cmp(me, you) >= 0
 }
+
+def max3[A](a: A, b: A, c: A)(implicit ord: Ord[A]) : A =
+	if (ord.<=(a, b)) { if (ord.<=(b,c)) c else b }	else { if (ord.<=(a,c)) c else a }
+	implicit val intOrd : Ord[Int] = new Ord[Int] { 
+	def cmp(me: Int, you: Int) = me.compare(you) 
+}
+	max3(3,2,10) // 10
 ```
+
+### Syntatic Sugar: new A with B with C { ... }
+```scala
+new A with B with C{ 
+	code}
+is equivalent to{	class _tmp_ extends A with B with C {		code
+	}	new _tmp_ 
+}
+```
+
+### Implicit
+* Implicit
+	* An argument is given "implicitly"
+	
+	```scala
+	def foo(s: String)(implicit t: String) = s + t 
+	implicit val exclamation : String = "!!!!!!"	foo("Hi")	foo("Hi")("???") // can give it explicitly
+	```
 
 ### Bag Example
 ```scala
@@ -2651,27 +2688,95 @@ class Bag[A] protected (val toList: List[A])(implicit proxy: Ord[A]) {
 		new Bag(go(toList))
 	}
 }
-implicit val intProxy: Ord[Int] = new Ord[Int] { def cmp(me: Int, you: Int) = me.compare(you) }
+implicit val intProxy: Ord[Int] = new Ord[Int] { 
+	def cmp(me: Int, you: Int) = me.compare(you) 
+}
 
 (new Bag[Int]()).add(3).add(2).add(10).toList
 ```
 
-### Context Bound: Syntatic Sugar
+### Bootstrapping Implicits
 ```scala
-// class Bag[A] protected (val toList: List[A])(implicit proxy: Ord[A])
-class Bag[A: Ord] protected (val toList: List[A]) {
-	val proxy = implicitly[Ord[A]]
-	// def this()(implicit proxy: Ord[A]) = this(Nil)(proxy)
-	def this() = this(Nil)
+// lexicographic orderimplicit def tup2Ord[A, B](implicit ordA: Ord[A], ordB: Ord[B]) = { 
+	new Ord[(A, B)] {		def cmp(me: (A, B), you: (A, B)) : Int = { 
+			val c1 = ordA.cmp(me._1, you._1)			if (c1 != 0) c1			else { ordB.cmp(me._2, you._2) }		} 
+	}}val b = new Bag[(Int,(Int,Int))] b.add((3,(3,4))).add((3,(2,7))).add((4,(0,0))).toList
+```
+
+### With Different Orders
+
+```scala
+val inOrdRev: Ord[Int] = new Ord[Int] { 
+	def cmp(me: Int, you: Int) = you.compare(me) 
+}
 	
-	def add(x: A): Bag[A] = {
-		def go(elmts: List[A]): List[A] = elmts match {
-			case Nil => x :: Nil
-			case e :: _ if (proxy.<(x, e)) => x :: elmts
-			case e :: _ if (proxy.===(x, e)) => elmts
-			case e :: rest => e :: go(rest)
-		}
-		new Bag(go(toList))
+(new Bag[Int]()(IntOrdRev)).add(3).add(2).add(10).toList
+```
+
+## 5월 25일
+`implicit` 을 너무 복잡하게 쓰면, 다른 사람이 쓰기 어려워서 안좋다.
+
+## Type Classes With Multiple Parameters
+
+### Iter
+```scala
+// trait Iter[A] {//     def getValue: Option[A]//     def getNext: Iter[A] 
+// }abstract class Iter[I,A] {	def getValue(a: I): Option[A]	def getNext(a: I): I 
+}
+def sumElements[I](xs: I)(implicit proxy: Iter[I,Int]): Int = proxy.getValue(xs) match {	case None => 0	case Some(n) => n + sumElements(proxy.getNext(xs)) 
+}
+def printElements[I,A](xs: I)(implicit proxy: Iter[I,A]): Unit = proxy.getValue(xs) match {	case None =>	case Some(n) => {
+		println(n);
+		printElements(proxy.getNext(xs))
 	}
 }
+```
+
+### List 
+```scala
+implicit def listIter[A]: Iter[List[A], A] = new Iter[List[A],A] {	def getValue(a: List[A]) = a.headOption	def getNext(a: List[A]) = a.tail 
+}val l = List(3,5,2,1)sumElements(l) //sumElements(l)(listIter[Int]) 
+
+printElements(l) //printElements(l)(listIter[Int])
+```
+
+### Iterable
+```scala
+// trait Iterable[A] { 
+//     def iter : Iter[A] 
+// }
+abstract class Iterable[R, A] { 
+	type iterT	def iter(a: R): iterT	def iterProxy: Iter[iterT, A]}
+def sumElements2[R](xs: R)(implicit proxy: Iterable[R,Int]) =
+	sumElements(proxy.iter(xs))(proxy.iterProxy) 
+//sumElements[proxy.iterT](proxy.iter(xs))(proxy.iterProxy)
+def printElements2[R,A](xs: R)(implicit proxy: Iterable[R,A]) = 
+	printElements(proxy.iter(xs))(proxy.iterProxy)//printElements[proxy.iterT,A](proxy.iter(xs))(proxy.iterProxy)
+```
+
+### Iterable: Bad Designs
+```scala
+// Too much information is specified, it's bad.abstract class Iterable2[R, I, A] { 
+	def iter(a: R): I	def iterProxy: Iter[I, A]}
+// Too little information is specified, it's wrong.abstract class Iterable3[R] { 
+	type elmtT	type iterT	def iter(a: R): iterT	def iterProxy: Iter[iterT, elmtT] 
+}
+```
+
+### MyTree
+```scala
+sealed abstract class MyTree[A]case class Empty[A]() extends MyTree[A]case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
+implicit def treeIterable[A](implicit proxy: Iter[List[A], A]): Iterable[MyTree[A], A] = new Iterable[MyTree[A], A] {	type iterT = List[A]	def iter(a: MyTree[A]): List[A] = a match {		case Empty() => Nil		case Node(v, left, right) => v :: (iter(left) ++ iter(right)) 
+	}    val iterProxy = proxy 
+}
+val t : MyTree[Int] = Node(3,Node(4,Empty(),Empty()),Node(2,Empty(),Empty()))sumElements2(t) //sumElements2(t)(treeIterable[Int]) 
+printElements2(t) //printElements2(t)(treeIterable[Int])
+```
+
+### Iter being Iterable
+```scala
+implicit def iterIterable[I ,A](implicit proxy: Iter[I, A]): Iterable[I, A] = new Iterable[I, A] { 
+	type iterT = I	def iter(a: I) = a 
+	val iterProxy = proxy}
+// val l = List(3,5,2,1)sumElements2(l) //sumElements2(iterIterable(listIter[Int]))printElements2(l) //printElements2(iterIterable(listIter[Int]))
 ```
