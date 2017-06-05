@@ -2562,7 +2562,7 @@ The subtype relation for "with" is structural.
 	
 	* Associate functionality with types
 	* Separate functionality from data
-	* TOP is particularly useful for writing specifications!
+	* **TOP is particularly useful for writing specifications!**
 
 ## Specifications over Parameter Types
 
@@ -2583,7 +2583,7 @@ trait Ord {
 
 def max3(a: Ord, b: Ord, c: Ord): Ord = 
 	if (a <= b) { if (b <= c) c else c }
-	else        { if (b <= c) c else b }
+	else { if (b <= c) c else b }
 ```
 
 Problem: hard (almost impossible) to define `OrdInt <: Ord`
@@ -2603,7 +2603,7 @@ trait Ord[A] {
 
 def max3[A](a: Ord[A], b: Ord[A], c: Ord[A]): Ord[A] = 
 	if (a <= b) { if (b <= c) c else b }
-	else        { if (a <= c) c else a }
+	else { if (a <= c) c else a }
 	
 class OInt(val getInt: Int) extends Ord[OInt] {
 	def cmp(that: Ord[OInt]) = getInt.compare(that.getValue.getInt)
@@ -2632,7 +2632,7 @@ val b = emp.add(new OInt(3)).add(new OInt(2)).add(new OInt(10))
 b.toList.map((x) => x.getInt)
 ```
 
-Works, but very awkward
+**Works, but very awkward!**
 
 ## Type Classes
 ### Completely Separating Ord from Int
@@ -2650,7 +2650,7 @@ abstract class Ord[A] {
 def max3[A](a: A, b: A, c: A)(implicit ord: Ord[A]) : A =
 	if (ord.<=(a, b)) { if (ord.<=(b,c)) c else b }	else { if (ord.<=(a,c)) c else a }
 	implicit val intOrd : Ord[Int] = new Ord[Int] { 
-	def cmp(me: Int, you: Int) = me.compare(you) 
+	def cmp(me: Int, you: Int) = me - you
 }
 	max3(3,2,10) // 10
 ```
@@ -2688,7 +2688,7 @@ class Bag[A] protected (val toList: List[A])(implicit proxy: Ord[A]) {
 		new Bag(go(toList))
 	}
 }
-implicit val intProxy: Ord[Int] = new Ord[Int] { 
+implicit val intOrd: Ord[Int] = new Ord[Int] { 
 	def cmp(me: Int, you: Int) = me.compare(you) 
 }
 
@@ -2700,14 +2700,15 @@ implicit val intProxy: Ord[Int] = new Ord[Int] {
 // lexicographic orderimplicit def tup2Ord[A, B](implicit ordA: Ord[A], ordB: Ord[B]) = { 
 	new Ord[(A, B)] {		def cmp(me: (A, B), you: (A, B)) : Int = { 
 			val c1 = ordA.cmp(me._1, you._1)			if (c1 != 0) c1			else { ordB.cmp(me._2, you._2) }		} 
-	}}val b = new Bag[(Int,(Int,Int))] b.add((3,(3,4))).add((3,(2,7))).add((4,(0,0))).toList
+	}}val b = new Bag[(Int,(Int,Int))]
+b.add((3,(3,4))).add((3,(2,7))).add((4,(0,0))).toList
 ```
 
 ### With Different Orders
 
 ```scala
 val inOrdRev: Ord[Int] = new Ord[Int] { 
-	def cmp(me: Int, you: Int) = you.compare(me) 
+	def cmp(me: Int, you: Int) = you - me
 }
 	
 (new Bag[Int]()(IntOrdRev)).add(3).add(2).add(10).toList
@@ -2723,7 +2724,7 @@ val inOrdRev: Ord[Int] = new Ord[Int] {
 // trait Iter[A] {//     def getValue: Option[A]//     def getNext: Iter[A] 
 // }abstract class Iter[I,A] {	def getValue(a: I): Option[A]	def getNext(a: I): I 
 }
-def sumElements[I](xs: I)(implicit proxy: Iter[I,Int]): Int = proxy.getValue(xs) match {	case None => 0	case Some(n) => n + sumElements(proxy.getNext(xs)) 
+def sumElements[I](xs: I)(implicit proxy: Iter[I, Int]): Int = proxy.getValue(xs) match {	case None => 0	case Some(n) => n + sumElements(proxy.getNext(xs)) 
 }
 def printElements[I,A](xs: I)(implicit proxy: Iter[I,A]): Unit = proxy.getValue(xs) match {	case None =>	case Some(n) => {
 		println(n);
@@ -2745,28 +2746,19 @@ printElements(l) //printElements(l)(listIter[Int])
 // trait Iterable[A] { 
 //     def iter : Iter[A] 
 // }
-abstract class Iterable[R, A] { 
-	type iterT	def iter(a: R): iterT	def iterProxy: Iter[iterT, A]}
-def sumElements2[R](xs: R)(implicit proxy: Iterable[R,Int]) =
+abstract class Iterable[R, I, A] { 
+	type iterT	def iter(a: R): I	def iterProxy: Iter[I, A]}
+def sumElements2[R, I](xs: R)(implicit proxy: Iterable[R, I, Int]) =
 	sumElements(proxy.iter(xs))(proxy.iterProxy) 
-//sumElements[proxy.iterT](proxy.iter(xs))(proxy.iterProxy)
-def printElements2[R,A](xs: R)(implicit proxy: Iterable[R,A]) = 
-	printElements(proxy.iter(xs))(proxy.iterProxy)//printElements[proxy.iterT,A](proxy.iter(xs))(proxy.iterProxy)
-```
-
-### Iterable: Bad Designs
-```scala
-// Too much information is specified, it's bad.abstract class Iterable2[R, I, A] { 
-	def iter(a: R): I	def iterProxy: Iter[I, A]}
-// Too little information is specified, it's wrong.abstract class Iterable3[R] { 
-	type elmtT	type iterT	def iter(a: R): iterT	def iterProxy: Iter[iterT, elmtT] 
-}
+	//sumElements[I](proxy.iter(xs))(proxy.iterProxy)
+def printElements2[R, I, A](xs: R)(implicit proxy: Iterable[R, I, A]) = 
+	printElements(proxy.iter(xs))(proxy.iterProxy)	//printElements[I, A](proxy.iter(xs))(proxy.iterProxy)
 ```
 
 ### MyTree
 ```scala
 sealed abstract class MyTree[A]case class Empty[A]() extends MyTree[A]case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
-implicit def treeIterable[A](implicit proxy: Iter[List[A], A]): Iterable[MyTree[A], A] = new Iterable[MyTree[A], A] {	type iterT = List[A]	def iter(a: MyTree[A]): List[A] = a match {		case Empty() => Nil		case Node(v, left, right) => v :: (iter(left) ++ iter(right)) 
+implicit def treeIterable[A](implicit proxy: Iter[List[A], A]): Iterable[MyTree[A], List[A], A] = new Iterable[MyTree[A], List[A], A] {	def iter(a: MyTree[A]): List[A] = a match {		case Empty() => Nil		case Node(v, left, right) => v :: (iter(left) ++ iter(right)) 
 	}    val iterProxy = proxy 
 }
 val t : MyTree[Int] = Node(3,Node(4,Empty(),Empty()),Node(2,Empty(),Empty()))sumElements2(t) //sumElements2(t)(treeIterable[Int]) 
@@ -2775,8 +2767,167 @@ printElements2(t) //printElements2(t)(treeIterable[Int])
 
 ### Iter being Iterable
 ```scala
-implicit def iterIterable[I ,A](implicit proxy: Iter[I, A]): Iterable[I, A] = new Iterable[I, A] { 
-	type iterT = I	def iter(a: I) = a 
+implicit def iterIterable[I ,A](implicit proxy: Iter[I, A]): Iterable[I, I, A] = new Iterable[I, I, A] { 	def iter(a: I) = a 
 	val iterProxy = proxy}
 // val l = List(3,5,2,1)sumElements2(l) //sumElements2(iterIterable(listIter[Int]))printElements2(l) //printElements2(iterIterable(listIter[Int]))
+```
+
+## Higher-kind Type Classes
+### Iter
+```scala
+import scala.language.higherKinds
+// trait Iter[I, A] {
+//     def getValue(a: I): Option[A]
+//     def getNext(a: I): I
+// }
+abstract class Iter[I[_]] {
+	def getValue[A](a: I[A]): Option[A]
+	def getNext[A](a: I[A]): I[A]
+}
+def sumElements[I[_]](xs: I[Int])(implicit itr: Iter[I]): Int = {
+	itr.getValue(xs) match {
+		case None => 0
+		case Some(n) => n + sumElements(itr.getNext(xs))
+	}
+}
+def printElements[I[_]], A](xs: I[A])(implicit: Iter[I]): Unit = {
+	itr.getValue(xs) match {
+		case None =>
+		case Some(n) => { 
+			println(n)
+			printElements(itr.getNext(xs))
+		}
+	}
+}
+``` 
+
+### List
+```scala
+implicit val listIter: Iter[List] = new Iter[List] {
+	def getValue[A](a: List[A]) = a.headOption
+	def getNext[a](a: List[A]) = a.tail
+}
+
+val l = List(3, 5, 2, 1)
+sumElements(l) //sumElements(l)(listIter) printElements(l) //printElements(l)(listIter)
+```
+
+### Iterable
+```scala
+// trait Iterable[R, I, A] {//     def iter(a: R): I//     def iterProxy: Iter[I, A]// }
+abstract class Iterable[R[_], I[_]] {
+	def iter[A](a: R[A]): I[A]
+	def iterProxy: Iter[A]
+}
+
+def sumElements2[R[_], I[_]](xs: R[Int])(implicit proxy: Iterable[R, I]) = 
+	sumElemnts(proxy.iter(xs))(proxy.iterProxy)
+	// sumElements[I](proxy.iter(xs))(proxy.iterProxy)
+
+def printElements2[R[_], I[_], A](xs: R[A])(implicit proxy: Iterable[R, I]) =
+	printElements(proxy.iter(xs))(proxy.iterProxy)
+	// printElements[I, A](proxy.iter(xs))(proxy.iterProxy)
+```
+
+### MyTree
+```scala
+sealed abstract class MyTree[A]
+case class Empty[A]() extends MyTree[A]
+case class Node[a](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
+
+implicit val treeIterable: Iterable[MyTree, List] = new Iterable[MyTree, List] {
+	def iter[A](a: MyTree[A]): List[A] = a match {
+		case Empty() => Nil
+		case Node(v, left, right) => v :: (iter(left) ++ iter(right)) 
+	}
+	val iterProxy = implicitly[Iter[List]]
+}
+
+val t: MyTree[Int] = Node(3,Node(4,Empty(),Empty()),Node(2,Empty(),Empty()))
+sumElements2(t) //sumElements2(t)(treeIterable) 
+printElements2(t) //printElements2(t)(treeIterable)
+```
+
+### Implicitly
+* Definition
+	
+	```scala
+	def implicitly[A](implicit proxy: A): A = proxy
+	```
+* Example
+
+	```scala
+	implicit val treeIterable: Iterable[MyTree, List] = new Iterable[MyTree, List] {
+		def iter[A](a: MyTree[A]): List[A] = a match {
+			case Empty() => Nil
+			case Node(v, left, right) => v :: (iter(left) ++ iter(right)) 
+		}
+		val iterProxy = implicitly[Iter[List]]
+	}
+	
+	implicit def treeIterable(implicit proxy: Iter[List]): Iterable[MyTree, List] = new Iterable[MyTree, List] {
+		def iter[A](a: MyTree[A]): List[A] = a match {
+			case Empty() => Nil
+			case Node(v, left, right) => v :: (iter(left) ++ iter(right))
+		}
+		val iterProxy = proxy
+	}
+	```
+	
+### Iter being Iterable
+```scala
+implicit def iterIterable[I[_]](implicit proxy: Iter[I]): Iterable[I, I] = new Iterable[I, I] {
+	def iter[A](a: I[A]) = a
+	def iterProxy = proxy
+}
+
+// val l = List(3,5,2,1)sumElements2(l) //sumElements2(l)(iterIterable(listIter)) 
+printElements2(l) //printElements2(l)(iterIterable(listIter))
+```
+
+### Example: Functor Specification
+```scala
+trait Functor[F[_]] {
+	def map[A, B](f: A => B)(x: F[A]): F[B]
+}
+
+def compose[F[_], A, B, C](g: B => C)(f: A => B)(a: F[A])(implict proxy: Functor[F]): F[C] = 
+	proxy.map(g)(proxy.map(f)(a))
+```
+
+### Example: Functor Implementation
+```scala
+sealed abstract class MyTree[A]
+case class Empty[A]() extends MyTree[A]
+case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
+
+implicit val ListFunctor: Functor[List] = new Functor[List] {
+	def map[A, B](f: A => B)(x: List[A]) = x.map(f)
+}
+implicit val MyTreeFunctor: Functor[MyTree] = new Functor[MyTree] {
+	def map[A, B])(f: A => B)(x: MyTree[A]): MyTree[B] = x match [
+		case Empty() => Empty()
+		case Node(v, l, r) => Node(f(v), map(f)(l), map(f)(r))
+	}
+}
+
+compose((x: Int) => x * x)((x: Int) => x + x)(List(1, 2, 3))
+
+val t : MyTree[Int] = Node(3,Node(4,Empty(),Empty()),Node(2,Empty(),Empty()))compose((x: Int)=> x * x)((x: Int) => x + x)(t)
+```
+
+### Even Higher Kinds
+```scala
+// Iter: (* -> *) -> *
+abstract class Iter[I[_]] {
+	def getValue[A](a: I[A]): Option[A]
+	def getNext[A](a: I[A]): I[A]
+}
+
+// Foo: ((* -> *) -> *) -> *
+abstract class Foo[I[_[_]]] {
+	def get: I[List]
+}
+
+def f(x: Foo[Iter]): Iter[List] = x.get
 ```
