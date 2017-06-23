@@ -1456,7 +1456,7 @@ object gee {
 	def b: Int = a + 20
 	def f(z: Int): Int = b + 20 + z
 }
-type gee_type = { val a: Int, def b: Int; def f(z: Int): Int }
+type gee_type = { val a: Int; def b: Int; def f(z: Int): Int }
 
 class foo_type(x: Int, y: Int) {
 	val a: Int = x
@@ -1517,7 +1517,7 @@ val t: YourList[Int] = Some(new MyList(3, Some(new MyList(4, None))))
 
 Structural type cannot be recursive. If we want recursive datatype, we need to use algebraic data type. Because syntatically structural data type has no name. And implicit sub typing makes recursive type declaration be impossible.
 
-And implicit sub typing makes programmer understand code.
+And implicit sub typing makes programmer can't understand code.
 
 Class and Structural type always contains `null` value. But it is not type safe. Algebraic datatype 과 class 의 차이: class 는 오직 하나의 constructor field 만 존재한다. 반면 algebraic datatype 은 constructor field의 disjoint union 을 제공한다. `null` value 를 제공하는 이유는 이러한 disjoint union 을 class 에도 비슷하게 나마 제공하기 위함이다?
 
@@ -1557,7 +1557,7 @@ object MyList {
 	def apply[A](v: A, nxt: Option[MyList[A]]) =
 		new MyList(v, nxt)
 }
-type YourList[a] = Option[MyList[A]] // can be length 0
+type YourList[A] = Option[MyList[A]] // can be length 0
 
 val t0 = None
 val t1 = Some(new MyList(3, Some(new MyList(4, None))))
@@ -1740,11 +1740,11 @@ sealed abstract class MyTree[A]
 case class MyLeaf[A]() extends MyTree[A] 
 case class MyNode[A](v: Int, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
 
-val t: MyTree[Int] = Node(3, Node(4, Empty(), Empty()), Empty())
+val t: MyTree[Int] = MyNode(3, Node(4, MyLeaf(), MyLeaf()), MyLeaf())
 
 t match {
-	case Empty() => 0
-	case Node(v, l, r) => v
+	case MyLeaf() => 0
+	case MyNode(v, l, r) => v
 }
 ```
 
@@ -1865,7 +1865,7 @@ sealed abstract class MyList[A] extends Iter[A] {
 }
 case class MyNil[A]() extends MyList[A] {
 	def getValue = None
-	deg getNext = this
+	def getNext = this
 	def append(lit: MyList[A]) = list
 }
 case class MyCons[A](hd: A, tl: MyList[A]) extends MyList[A] {
@@ -2038,7 +2038,7 @@ abstract class Iterable[A](eq: (A, A) => Boolean) {
 	def getValue(i: iter_t): Option[A]
 	def getNext(i: iter_t): iter_t
 	def hasElement(a: A): Boolean = {
-		def hasElementiter(i: iter_t): Boolean = getValue(i) match {
+		def hasElementIter(i: iter_t): Boolean = getValue(i) match {
 			case None => false
 			case Some(n) => 
 				if (eq(a, n)) true
@@ -2109,7 +2109,7 @@ n 번째 prime number 를 구하기 위해서, client 에게 필요한 것은 `P
 ```scala
 class Primes(val prime: Int, val primes: List[Int]) { 
 	def this() = this(3, List(3))
-		def getNext: Primes = { 
+	def getNext: Primes = { 
 		val p = computeNextPrime(prime + 2)
 		new Primes(p, primes ++ (p :: Nil))
 	}
@@ -2493,7 +2493,7 @@ val (v2, s5) = s4.get()
 
 	```scala
 	trait A { val a: Int = 0 }
-	triat B { val b: Int = 0 }
+	trait B { val b: Int = 0 }
 	class C extends A with B {
 		override val a = 10
 		override val b = 20
@@ -2689,7 +2689,7 @@ class Bag[A] protected (val toList: List[A])(implicit proxy: Ord[A]) {
 	}
 }
 implicit val intOrd: Ord[Int] = new Ord[Int] { 
-	def cmp(me: Int, you: Int) = me.compare(you) 
+	def cmp(me: Int, you: Int) = me - you
 }
 
 (new Bag[Int]()).add(3).add(2).add(10).toList
@@ -2722,12 +2722,12 @@ val inOrdRev: Ord[Int] = new Ord[Int] {
 ### Iter
 ```scala
 // trait Iter[A] {//     def getValue: Option[A]//     def getNext: Iter[A] 
-// }abstract class Iter[I,A] {	def getValue(a: I): Option[A]	def getNext(a: I): I 
+// }abstract class Iter[I, A] {	def getValue(a: I): Option[A]	def getNext(a: I): I 
 }
 def sumElements[I](xs: I)(implicit proxy: Iter[I, Int]): Int = proxy.getValue(xs) match {	case None => 0	case Some(n) => n + sumElements(proxy.getNext(xs)) 
 }
-def printElements[I,A](xs: I)(implicit proxy: Iter[I,A]): Unit = proxy.getValue(xs) match {	case None =>	case Some(n) => {
-		println(n);
+def printElements[I, A](xs: I)(implicit proxy: Iter[I,A]): Unit = proxy.getValue(xs) match {	case None =>	case Some(n) => {
+		println(n)
 		printElements(proxy.getNext(xs))
 	}
 }
@@ -2735,9 +2735,8 @@ val inOrdRev: Ord[Int] = new Ord[Int] {
 
 ### List 
 ```scala
-implicit def listIter[A]: Iter[List[A], A] = new Iter[List[A],A] {	def getValue(a: List[A]) = a.headOption	def getNext(a: List[A]) = a.tail 
-}val l = List(3,5,2,1)sumElements(l) //sumElements(l)(listIter[Int]) 
-
+implicit def listIter[A]: Iter[List[A], A] = new Iter[List[A], A] {	def getValue(a: List[A]) = a.headOption	def getNext(a: List[A]) = a.tail 
+}val l = List(3,5,2,1)sumElements(l) //sumElements(l)(listIter[Int]) 
 printElements(l) //printElements(l)(listIter[Int])
 ```
 
@@ -2747,7 +2746,7 @@ printElements(l) //printElements(l)(listIter[Int])
 //     def iter : Iter[A] 
 // }
 abstract class Iterable[R, I, A] { 
-	type iterT	def iter(a: R): I	def iterProxy: Iter[I, A]}
+	def iter(a: R): I	def iterProxy: Iter[I, A]}
 def sumElements2[R, I](xs: R)(implicit proxy: Iterable[R, I, Int]) =
 	sumElements(proxy.iter(xs))(proxy.iterProxy) 
 	//sumElements[I](proxy.iter(xs))(proxy.iterProxy)
@@ -2758,7 +2757,8 @@ printElements(l) //printElements(l)(listIter[Int])
 ### MyTree
 ```scala
 sealed abstract class MyTree[A]case class Empty[A]() extends MyTree[A]case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
-implicit def treeIterable[A](implicit proxy: Iter[List[A], A]): Iterable[MyTree[A], List[A], A] = new Iterable[MyTree[A], List[A], A] {	def iter(a: MyTree[A]): List[A] = a match {		case Empty() => Nil		case Node(v, left, right) => v :: (iter(left) ++ iter(right)) 
+implicit def treeIterable[A](implicit proxy: Iter[List[A], A]): Iterable[MyTree[A], List[A], A] = 
+new Iterable[MyTree[A], List[A], A] {	def iter(a: MyTree[A]): List[A] = a match {		case Empty() => Nil		case Node(v, left, right) => v :: (iter(left) ++ iter(right)) 
 	}    val iterProxy = proxy 
 }
 val t : MyTree[Int] = Node(3,Node(4,Empty(),Empty()),Node(2,Empty(),Empty()))sumElements2(t) //sumElements2(t)(treeIterable[Int]) 
@@ -2767,7 +2767,7 @@ printElements2(t) //printElements2(t)(treeIterable[Int])
 
 ### Iter being Iterable
 ```scala
-implicit def iterIterable[I ,A](implicit proxy: Iter[I, A]): Iterable[I, I, A] = new Iterable[I, I, A] { 	def iter(a: I) = a 
+implicit def iterIterable[I, A](implicit proxy: Iter[I, A]): Iterable[I, I, A] = new Iterable[I, I, A] { 	def iter(a: I) = a 
 	val iterProxy = proxy}
 // val l = List(3,5,2,1)sumElements2(l) //sumElements2(iterIterable(listIter[Int]))printElements2(l) //printElements2(iterIterable(listIter[Int]))
 ```
@@ -2790,7 +2790,7 @@ def sumElements[I[_]](xs: I[Int])(implicit itr: Iter[I]): Int = {
 		case Some(n) => n + sumElements(itr.getNext(xs))
 	}
 }
-def printElements[I[_]], A](xs: I[A])(implicit: Iter[I]): Unit = {
+def printElements[I[_]], A](xs: I[A])(implicit itr: Iter[I]): Unit = {
 	itr.getValue(xs) match {
 		case None =>
 		case Some(n) => { 
@@ -2805,11 +2805,12 @@ def printElements[I[_]], A](xs: I[A])(implicit: Iter[I]): Unit = {
 ```scala
 implicit val listIter: Iter[List] = new Iter[List] {
 	def getValue[A](a: List[A]) = a.headOption
-	def getNext[a](a: List[A]) = a.tail
+	def getNext[A](a: List[A]) = a.tail
 }
 
 val l = List(3, 5, 2, 1)
-sumElements(l) //sumElements(l)(listIter) printElements(l) //printElements(l)(listIter)
+sumElements(l) //sumElements(l)(listIter) 
+printElements(l) //printElements(l)(listIter)
 ```
 
 ### Iterable
@@ -2817,7 +2818,7 @@ sumElements(l) //sumElements(l)(listIter) printElements(l) //printElements(l)(li
 // trait Iterable[R, I, A] {//     def iter(a: R): I//     def iterProxy: Iter[I, A]// }
 abstract class Iterable[R[_], I[_]] {
 	def iter[A](a: R[A]): I[A]
-	def iterProxy: Iter[A]
+	def iterProxy: Iter[I]
 }
 
 def sumElements2[R[_], I[_]](xs: R[Int])(implicit proxy: Iterable[R, I]) = 
@@ -2833,7 +2834,7 @@ def printElements2[R[_], I[_], A](xs: R[A])(implicit proxy: Iterable[R, I]) =
 ```scala
 sealed abstract class MyTree[A]
 case class Empty[A]() extends MyTree[A]
-case class Node[a](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
+case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
 
 implicit val treeIterable: Iterable[MyTree, List] = new Iterable[MyTree, List] {
 	def iter[A](a: MyTree[A]): List[A] = a match {
@@ -2905,7 +2906,7 @@ implicit val ListFunctor: Functor[List] = new Functor[List] {
 	def map[A, B](f: A => B)(x: List[A]) = x.map(f)
 }
 implicit val MyTreeFunctor: Functor[MyTree] = new Functor[MyTree] {
-	def map[A, B])(f: A => B)(x: MyTree[A]): MyTree[B] = x match [
+	def map[A, B](f: A => B)(x: MyTree[A]): MyTree[B] = x match {
 		case Empty() => Empty()
 		case Node(v, l, r) => Node(f(v), map(f)(l), map(f)(r))
 	}
@@ -2931,3 +2932,352 @@ abstract class Foo[I[_[_]]] {
 
 def f(x: Foo[Iter]): Iter[List] = x.get
 ```
+
+## Turning Type Classes into OO Classes
+### Iter
+```scala
+// triat Iter[A] {
+//     def getValue: Option[A]
+//     def getNext: Iter[A]
+// }
+
+abstract class Iter[I, A] {
+	def gatValue(i: I): Option[A]
+	def getNext(i: I): I
+}
+
+def sumElements[I](xs: I)(implicit proxy: Iter[I, Int]): Int = proxy.getValue(xs) match {
+	case None => 0
+	case Some(n) => n + sumElements(proxy.getNext(xs)) 
+}
+
+def printElements[I, A](xs: I)(implicit proxy: Iter[I, A]): Unit = proxy.getValue(xs) match {
+	case None =>
+	case Some(n) => {
+		println(n)
+		printElements(proxy.getNext(xs))
+	}
+}
+```
+
+### List
+```scala
+implicit def listIter[A]: Iter[List[A], A] = new Iter[List[A], A] {
+	def getValue(a: List[A]) = a.headOption
+	def getNext(a: List[A]) = a.tail
+}
+
+val l = List(3, 5, 2, 1)
+
+sumElements(I) // sumElements(I)(listIter[Int])
+printElements(I) // printElements(I)(listIter[Int])
+```
+
+### How to return data satisfying a specification?
+```scala
+def incIter(max: Int): Iter[Int, Int] = new Iter[Int, Int] {
+	def getValue(i: Int) = if (i <= max) Some(i) else None
+	def getNext(i: Int) = i + 1
+}
+
+def getMyIter(isInc: Boolean): ? = {
+	if (isInc) ? // want to return 0 with incIter(10)
+	else ? // want to return List(3, 1, 4) with listIter
+}
+
+val i1 = getMyIter(true)
+printElements(i1)
+val i2 = getMyIter(false)
+printElements(i2)
+```
+
+What can we do?
+
+### Turing Type Classes into OO Classes
+```scala
+import scala.language.higherKinds
+import scala.language.implicitConversions
+
+abstract class Dyn2[S[_, _], A] {
+	type Data
+	val d: Data
+	val i: S[Data, A]
+}
+
+object Dyn2 {
+	implicit def apply[S[_, _], D, A](dd: D)(implicit ii: S[D, A]): 
+	Dyn2[S, A] = new Dyn2[S, A] {
+		type Data = D
+		val d = dd
+		val i = ii
+	}
+	implicit def methods[S[_, _], A](d: Dyn2[S, A]): S[d.Data, A] = d.i
+}
+```
+
+### Test
+```scala
+def incIter(max: Int): Iter[Int, Int] = new Iter[Int, Int] {
+	def getValue(i: Int) = if (i <= max) Some(i) else None
+	def getNext(i: Int) = i + 1
+}
+
+def getMyIter(isInc: Boolean): Dyn2[Iter, Int] = {
+	if (isInc) Dyn2(0)(incIter(10)) // Dyn2.apply(0)(incIter(10))
+	else List(3, 1, 4) // Dyn2(List(3, 1, 4))(listIter[Int])
+}
+
+val i1 = getMyIter(true)
+printElements(i1.d)(i1.i)
+i1.getValue(i1.getNext(i1.d)) // i1.i.getValue(i1.i.getNext(i1.d))
+
+val i2 = getMyIter(false)
+printElements(i2.d)(i2.i)
+i2.getValue(i2.getNext(i2.d))
+```
+
+### Can define "Dyn" for different kinds of specs
+```scala
+abstract class Dyn[S[_]] {
+	type Data
+	val d: Data
+	val i: S[Data]
+}
+
+object Dyn {
+	implicit def apply[D, S[_]](dd: D)(implicit ii: S[D]):
+	Dyn[S] = new Dyn[S] {
+		type Data = D
+		val d = dd
+		val i = ii
+	}
+	implicit def methods[S[_]](d: Dyn[S]): S[d.Data] = d.i
+}
+```
+
+### Iterable 
+```scala
+// abstract class Iterable[R, I, A] {
+//     def iter(a: R): I
+//     def iterProxy: Iter[I, A]
+// }
+
+abstract class Iterable[R, A] {
+	def iter(a: R): Dyn2[Iter, A]
+}
+
+def sumElements2[R](xs: R)(implicit proxy: Iterable[R, Int]) = {
+	val cs = proxy.iter(xs)
+	sumElements(cs.d)(cs.i)
+}
+
+def printElements2[R, A](xs: R)(implicit proxy: Iterable[R, A]) = {
+	val cs = proxy.iter(xs)
+	printElements(cs.d)(cs.i)
+}
+```
+
+### MyTree
+```scala
+sealed abstract class MyTree[A]
+case class Empty[A]() extends MyTree[A]
+case class Node[A](value: A, left: MyTree[A], right: MyTree[A]) extends MyTree[A]
+
+implicit def treeIterable[A]: Iterable[MyTree[A], A] = new Iterable[MyTree[A], A] {
+	def iter(a: MyTree[A]) = {
+		def go(I: MyTree[A]: List[A] = I match {
+			case Empty() => Nil
+			case Node(v, left, right) => v :: (go(left) ++ go(right)) 
+		}
+		go(a) // Dyn2(go(a))(listIter[A])
+	}
+}
+
+val t : MyTree[Int] = Node(3,Node(4,Empty(),Empty()),Node(2,Empty(),Empty()))
+sumElements2(t) //sumElements2(t)(treeIterable[Int]) 
+printElements2(t) //printElements2(t)(treeIterable[Int])
+```
+
+### Iter being Iterable
+```scala
+implicit def iterIterable[I, A](implicit proxy: Iter[I, A]): Iterable[I, A] = new Iterable[I, A] {
+	def iter(a: I) = a // Dyn2(a)(proxy)
+}
+
+// val l = List(3, 5, 2, 1)
+sumElements2(l)
+printElements2(l)
+```
+
+## Stacking with Type Classes
+### IntStack Spec & Modifying Traits
+```scala 
+trait IntStack[A] {
+	def empty: A
+	def get(s: A): (Int, A)
+	def put(s: A)(x: Int): A
+}
+
+trait Doubling[A] extedns IntStack[A] {
+	abstract override def put(s: A)(x: Int): A = super.put(s)(2 * x)
+}
+
+trait Incrementing[A] extends IntStack[A] {
+	abstract override def put(s: A)(x: Int): A = super.put(s)(x + 1)
+}
+
+trait Filtering[A] extends IntStack[A] {
+	abstract override def put(s: A)(x: Int): A = 
+		if (x >= 0) super.put(s)(x) else s
+}
+```
+
+### Implementation using List
+```scala
+trait ListStackImpl extends IntStack[List[Int]] {
+	val empty = List()
+	def get(s: List[Int]) = (s.head, s.tail)
+	def put(s: List[Int])(x: Int) = x :: s
+}
+
+val stkDIF: IntStack[List[Int]] = new ListStackImpl
+                                    with Doubling[List[Int]]
+                                    with Incrementing[List[Int]]
+                                    with Filtering[List[Int]]
+											
+val s0 = stkDIF.emptyval s1 = stkDIF.put(s0)(3) 
+val s2 = stkDIF.put(s1)(-2) 
+val s3 = stkDIF.put(s2)(4) 
+val (v1,s4) = stkDIF.get(s3) 
+val (v2,s5) = stkDIF.get(s4)
+```
+
+### Implementation using SortedIntStack
+```scala
+class SortedStack protected (xs: List[Int]) {
+	override val toString = "Stack: " + xs.toString
+	def this() = this(Nil)
+	def get = (xs.head, new SortedStack(xs.tail))
+	def put(x: Int) = {
+		def go(l: List[Int]): List[Int] = l match {
+			case Nil => x :: Nil
+			case hd :: tl => if (x <= hd) x :: l else hd :: go(tl)
+		}
+		new SortedStack(go(xs))
+	}
+}
+
+trait SortedStackImpl extends IntStack[SortedStack] {
+	val empty = new SortedStack()
+	def get(s: SortedStack) = s.get
+	def put(s: SortedStack)(x: Int) = s.put(x)
+}
+```
+
+### Implementation using SortedIntStack: Test
+```scala
+val sortedDIF : IntStack[SortedStack] = new SortedStackImpl                                        with Doubling[SortedStack]
+                                        with Incrementing[SortedStack] 
+                                        with Filtering[SortedStack]val s0 = sortedDIF.emptyval s1 = sortedDIF.put(s0)(3)
+val s2 = sortedDIF.put(s1)(-2)
+val s3 = sortedDIF.put(s2)(4) 
+val (v1,s4) = sortedDIF.get(s3) 
+val (v2,s5) = sortedDIF.get(s4)
+```
+
+### Separating methods from SortedIntStack
+```scala
+class SortedStack protected (private val xs: List[Int]) {
+	override val toString = "Stack: " + xs.toString
+	def this() = this(Nil)
+}
+object SortedStack {
+	trait Impl extends IntStack[SortedStack] {
+		val empty: SortedStack = new SortedStack
+		def get(s: SortedStack) = (s.xs.head, new SortedStack(s.xs.tail))
+		
+		def put(s: SortedStack)(x: Int) = {
+			def go(l: List[Int]): List[Int] = l match {
+				case Nil => x :: Nil
+				case hd :: tl => if (x <= hd) x :: l else hd :: go(tl)
+			}
+			new SortedStack(go(s.xs))
+		}
+	}
+} 
+```
+
+### Separating methods from SortedIntStack: Test
+```scala
+val sortedDIF: IntStack[SortedStack] = new SortedStack.Impl
+                                       with Doubling[SortedStack]
+                                       with Incrementing[SortedStack]
+                                       with Filtering[SortedStack]
+
+val s0 = sortedDIF.emptyval s1 = sortedDIF.put(s0)(3)
+val s2 = sortedDIF.put(s1)(-2)
+val s3 = sortedDIF.put(s2)(4) 
+val (v1,s4) = sortedDIF.get(s3) 
+val (v2,s5) = sortedDIF.get(s4)
+```
+
+# PART 4 Imperative Programming with Memory Updates
+### Mutable Variables
+* Mutable Variables
+	* Use `var` instead of `val` and `def `
+	* We can update tha value stored in a variable.
+
+	```scala
+	class Main(i: Int) {
+		var a = i
+	}
+	
+	val m = new Main(10)
+	m.a
+	m.a = 20
+	m.a += 5
+	m.a 
+	```
+	
+### While loop
+* While loop
+	* Syntax: `while (cond) body`  
+	Executes *body* while *cond* holds.
+	* It is equivalnet to:
+
+	```scala
+	def myWhile(cond: =>Boolean)(body: =>Unit): Unit = 
+		if (cond) { body; myWhile(c)(body) } else ()
+	```
+
+* Example
+
+	```scala
+	var i = 0
+	var sum = 0
+	while (i <= 100) {
+		sum += i
+		i += 2
+	}
+	sum
+	```
+	
+### For loop
+* For loop
+	* Syntax: `for (i <- collection) body`  
+	Executes *body* for each `i` in *collection*.
+	* It is equivalent to:
+	
+	```scala
+	def myFor[A](xs: Traversable[A])(f: A => Unit): Unit = xs.foreach(f)
+	``` 
+
+* Example
+
+	```scala
+	var sum = 0
+	for (i <- 0 to 100 by 2) {
+		sum += i
+	}
+	sum 
+	```
