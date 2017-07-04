@@ -53,8 +53,7 @@ object Main {
   }
 
   def ReportOrdDictionary[D, K, V](ord_title : String, keyToString:(K)=>String,
-    valToString:(V)=>String)(implicit DictD: Dict[D, K, V]) :
-      Report[OrdDictionary[D, K]] = 
+    valToString:(V)=>String)(implicit DictD: Dict[D, K, V]): Report[OrdDictionary[D, K]] = 
   new Report[OrdDictionary[D, K]] {
     type A = (K, V)
     def title(r: OrdDictionary[D, K]): String = ord_title
